@@ -4,13 +4,14 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { ApplicationStatus, Prisma } from '@prisma/client';
+import { ApplicationStatus, Prisma, SimulationRun } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import { toNumber } from '../simulator/simulation.engine';
 import { SIMULATION_DISCLAIMER } from '../simulator/simulator.service';
 import { CreateApplicationDto } from './dto/create-application.dto';
+import { CreateLeadDto } from './dto/create-lead.dto';
 import { QueryApplicationsDto } from './dto/query-applications.dto';
 import { RejectApplicationDto } from './dto/reject-application.dto';
 import { AssignApplicationDto } from './dto/assign-application.dto';
@@ -70,31 +71,7 @@ export class ApplicationsService {
     }
 
     const product = simulationRun.product;
-
-    const simulationSnapshot = {
-      simulationRunId: simulationRun.id,
-      ruleVersionId: simulationRun.ruleVersionId,
-      isValid: simulationRun.isValid,
-      validationError: simulationRun.validationError,
-      sumAssured: toNumber(simulationRun.sumAssured),
-      paymentTermYears: simulationRun.paymentTermYears,
-      paymentFrequency: simulationRun.paymentFrequency,
-      monthlyPremium:
-        simulationRun.monthlyPremium != null ? toNumber(simulationRun.monthlyPremium) : null,
-      quarterlyPremium:
-        simulationRun.quarterlyPremium != null ? toNumber(simulationRun.quarterlyPremium) : null,
-      semiAnnualPremium:
-        simulationRun.semiAnnualPremium != null
-          ? toNumber(simulationRun.semiAnnualPremium)
-          : null,
-      annualPremium:
-        simulationRun.annualPremium != null ? toNumber(simulationRun.annualPremium) : null,
-      totalEstimatedPayment:
-        simulationRun.totalEstimatedPayment != null
-          ? toNumber(simulationRun.totalEstimatedPayment)
-          : null,
-      disclaimer: SIMULATION_DISCLAIMER,
-    };
+    const simulationSnapshot = this.buildSimulationSnapshot(simulationRun);
 
     const productSnapshot = {
       id: product.id,
@@ -146,6 +123,144 @@ export class ApplicationsService {
       entityType: 'Application',
       entityId: application.id,
       description: `Pengajuan baru ${application.applicantFullName} berhasil dikirimkan untuk produk ${product.name}.`,
+    });
+
+    return { id: application.id, referenceNo: application.referenceNo };
+  }
+
+  private buildSimulationSnapshot(simulationRun: SimulationRun) {
+    return {
+      simulationRunId: simulationRun.id,
+      ruleVersionId: simulationRun.ruleVersionId,
+      isValid: simulationRun.isValid,
+      validationError: simulationRun.validationError,
+      sumAssured: toNumber(simulationRun.sumAssured),
+      paymentTermYears: simulationRun.paymentTermYears,
+      paymentFrequency: simulationRun.paymentFrequency,
+      monthlyPremium:
+        simulationRun.monthlyPremium != null ? toNumber(simulationRun.monthlyPremium) : null,
+      quarterlyPremium:
+        simulationRun.quarterlyPremium != null ? toNumber(simulationRun.quarterlyPremium) : null,
+      semiAnnualPremium:
+        simulationRun.semiAnnualPremium != null
+          ? toNumber(simulationRun.semiAnnualPremium)
+          : null,
+      annualPremium:
+        simulationRun.annualPremium != null ? toNumber(simulationRun.annualPremium) : null,
+      totalEstimatedPayment:
+        simulationRun.totalEstimatedPayment != null
+          ? toNumber(simulationRun.totalEstimatedPayment)
+          : null,
+      disclaimer: SIMULATION_DISCLAIMER,
+    };
+  }
+
+  /**
+   * Lightweight lead capture for the PRAXIS Assistant chat workflow
+   * (Automation/) - a DRAFT application, optionally with a simulation
+   * attached. Unlike createAndSubmit(), a product is still required (no
+   * anonymous leads), but everything else about the applicant is optional
+   * except that at least one of email/phone must be present, and consent is
+   * still mandatory (PRD.md §9's consent-recording principle applies here
+   * too, not just to the formal web funnel).
+   */
+  async createLead(dto: CreateLeadDto) {
+    if (dto.consent !== true) {
+      throw new BadRequestException('Data consent is required to capture a lead.');
+    }
+    if (!dto.applicant.email && !dto.applicant.phone) {
+      throw new BadRequestException('At least one of applicant.email or applicant.phone is required.');
+    }
+
+    const product = await this.prisma.product.findUnique({ where: { id: dto.productId } });
+    if (!product) {
+      throw new NotFoundException('Product not found');
+    }
+
+    let simulationSnapshot: ReturnType<ApplicationsService['buildSimulationSnapshot']> | undefined;
+    let simulationRunId: string | undefined;
+    let ruleVersionId: string | undefined;
+
+    if (dto.simulationRunId) {
+      // Explicit id: caller knows exactly which simulation they mean, so a
+      // bad id is treated as a real error, not silently ignored.
+      const simulationRun = await this.prisma.simulationRun.findUnique({
+        where: { id: dto.simulationRunId },
+      });
+      if (!simulationRun) {
+        throw new NotFoundException('Simulation run not found');
+      }
+      if (simulationRun.productId !== product.id) {
+        throw new BadRequestException('simulationRunId does not belong to the given productId.');
+      }
+      simulationSnapshot = this.buildSimulationSnapshot(simulationRun);
+      simulationRunId = simulationRun.id;
+      ruleVersionId = simulationRun.ruleVersionId;
+    } else if (dto.sessionId) {
+      // Best-effort auto-attach for the chat workflow (see CreateLeadDto):
+      // a chat session with no prior simulation is a normal case, so finding
+      // none here is not an error - the lead is just captured without one.
+      const simulationRun = await this.prisma.simulationRun.findFirst({
+        where: { sessionId: dto.sessionId, productId: product.id, isValid: true },
+        orderBy: { createdAt: 'desc' },
+      });
+      if (simulationRun) {
+        simulationSnapshot = this.buildSimulationSnapshot(simulationRun);
+        simulationRunId = simulationRun.id;
+        ruleVersionId = simulationRun.ruleVersionId;
+      }
+    }
+
+    const productSnapshot = {
+      id: product.id,
+      slug: product.slug,
+      name: product.name,
+      categoryLabel: product.categoryLabel,
+    };
+
+    const referenceNo = await this.generateUniqueReferenceNo();
+    const now = new Date();
+
+    const application = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.application.create({
+        data: {
+          referenceNo,
+          productId: product.id,
+          simulationRunId,
+          ruleVersionId,
+          status: ApplicationStatus.DRAFT,
+          applicantFullName: dto.applicant.fullName,
+          applicantEmail: dto.applicant.email,
+          applicantPhone: dto.applicant.phone,
+          applicantAge: dto.applicant.age,
+          applicantCity: dto.applicant.city,
+          preferredContactTime: dto.applicant.preferredContactTime,
+          applicantNotes: dto.applicant.notes,
+          dataConsentAt: now,
+          productSnapshot,
+          simulationSnapshot,
+        },
+      });
+
+      await tx.applicationStatusHistory.create({
+        data: {
+          applicationId: created.id,
+          fromStatus: null,
+          toStatus: ApplicationStatus.DRAFT,
+          changedById: null,
+        },
+      });
+
+      return created;
+    });
+
+    await this.audit.log({
+      actorId: null,
+      actorLabel: 'PRAXIS Assistant (n8n)',
+      action: 'LEAD_CAPTURED',
+      entityType: 'Application',
+      entityId: application.id,
+      description: `Prospek baru ${application.applicantFullName} tertarik pada produk ${product.name} (ditangkap via asisten chat).`,
     });
 
     return { id: application.id, referenceNo: application.referenceNo };

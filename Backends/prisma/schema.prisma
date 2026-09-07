@@ -197,6 +197,15 @@ model SimulationRun {
   totalEstimatedPayment  Decimal?
   createdAt              DateTime              @default(now())
 
+  // Nullable: only set when a simulation was run through the PRAXIS Assistant
+  // chat workflow (Automation/), where it's the chat's own session id - not
+  // the formal web funnel, which has no notion of a "session" at all. Lets
+  // ApplicationsService.createLead() auto-attach the most recent simulation
+  // for a chat session to that same session's captured lead, without relying
+  // on the chatbot's LLM to correctly carry an opaque simulationRunId across
+  // conversation turns (found unreliable in practice with the free-tier model).
+  sessionId              String?
+
   applications Application[]
 }
 
@@ -212,16 +221,24 @@ model Application {
   status               ApplicationStatus      @default(SUBMITTED)
 
   applicantFullName    String
-  applicantEmail       String
-  applicantPhone       String
-  applicantAge         Int
-  applicantCity        String
-  preferredContactTime ContactTime
+  // Nullable below: a lead captured via the PRAXIS Assistant chat workflow
+  // (status DRAFT, see ApplicationsService.createLead()) may not have all of
+  // these yet - at least one of applicantEmail/applicantPhone is required at
+  // the application layer, the rest are genuinely optional for a lead. Every
+  // formal submission (status SUBMITTED via createAndSubmit()) still always
+  // populates all of them.
+  applicantEmail       String?
+  applicantPhone       String?
+  applicantAge         Int?
+  applicantCity        String?
+  preferredContactTime ContactTime?
   applicantNotes       String?
   dataConsentAt        DateTime
 
   productSnapshot      Json
-  simulationSnapshot   Json
+  // Nullable: a lead has no simulationRunId/ruleVersionId (both already
+  // nullable above) and therefore no simulation result to snapshot.
+  simulationSnapshot   Json?
 
   rejectionReason      String?
   submittedAt          DateTime  @default(now())

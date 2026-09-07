@@ -180,11 +180,15 @@ export function adaptInboxRow(row: BackendInboxRow): ApplicationRecord {
     submittedAt: formatWIB(row.submittedAt),
     lastUpdated: formatWIB(row.submittedAt),
     applicant: {
+      // Nullable on the backend for a DRAFT lead (see api.ts's BackendInboxRow
+      // doc comment) - coalesced to empty/zero here so the rest of the app can
+      // keep assuming ApplicantData's fields are always present, matching the
+      // pattern already established for simulation figures below.
       fullName: row.applicantFullName,
-      email: row.applicantEmail,
-      phone: row.applicantPhone,
-      age: row.applicantAge,
-      city: row.applicantCity,
+      email: row.applicantEmail ?? '',
+      phone: row.applicantPhone ?? '',
+      age: row.applicantAge ?? 0,
+      city: row.applicantCity ?? '',
       preferredContactTime: 'Pagi (09.00 - 12.00 WIB)',
       dataConsent: true,
     },
@@ -198,7 +202,7 @@ export function adaptInboxRow(row: BackendInboxRow): ApplicationRecord {
       params: {
         productId: row.product.id,
         productSlug: '',
-        age: row.applicantAge,
+        age: row.applicantAge ?? 0,
         sumAssured: row.sumAssured ?? 0,
         paymentTerm: row.paymentTermYears ?? 0,
         frequency: 'Bulanan',
@@ -225,12 +229,17 @@ export function adaptApplicationDetail(app: BackendApplicationDetail): Applicati
     submittedAt: formatWIB(app.submittedAt),
     lastUpdated: formatWIB(app.updatedAt),
     applicant: {
+      // Nullable on the backend for a DRAFT lead (see api.ts's
+      // BackendApplicationDetail doc comment) - coalesced to empty/zero here,
+      // same reasoning as adaptInboxRow above.
       fullName: app.applicantFullName,
-      email: app.applicantEmail,
-      phone: app.applicantPhone,
-      age: app.applicantAge,
-      city: app.applicantCity,
-      preferredContactTime: CONTACT_TIME_LABELS[app.preferredContactTime],
+      email: app.applicantEmail ?? '',
+      phone: app.applicantPhone ?? '',
+      age: app.applicantAge ?? 0,
+      city: app.applicantCity ?? '',
+      preferredContactTime: app.preferredContactTime
+        ? CONTACT_TIME_LABELS[app.preferredContactTime]
+        : 'Pagi (09.00 - 12.00 WIB)',
       notes: app.applicantNotes ?? undefined,
       dataConsent: true,
     },
@@ -244,16 +253,19 @@ export function adaptApplicationDetail(app: BackendApplicationDetail): Applicati
       params: {
         productId: app.product.id,
         productSlug: app.product.slug,
-        age: app.applicantAge,
-        sumAssured: sim.sumAssured ?? 0,
-        paymentTerm: sim.paymentTermYears ?? 0,
-        frequency: sim.paymentFrequency ? FREQUENCY_TO_FRONTEND[sim.paymentFrequency] : 'Bulanan',
+        age: app.applicantAge ?? 0,
+        sumAssured: sim?.sumAssured ?? 0,
+        paymentTerm: sim?.paymentTermYears ?? 0,
+        frequency: sim?.paymentFrequency ? FREQUENCY_TO_FRONTEND[sim.paymentFrequency] : 'Bulanan',
       },
-      monthlyPremium: sim.monthlyPremium ?? 0,
-      quarterlyPremium: sim.quarterlyPremium ?? 0,
-      semesterPremium: sim.semiAnnualPremium ?? 0,
-      annualPremium: sim.annualPremium ?? 0,
-      totalEstimatedInvestment: sim.totalEstimatedPayment ?? 0,
+      monthlyPremium: sim?.monthlyPremium ?? 0,
+      quarterlyPremium: sim?.quarterlyPremium ?? 0,
+      semesterPremium: sim?.semiAnnualPremium ?? 0,
+      annualPremium: sim?.annualPremium ?? 0,
+      totalEstimatedInvestment: sim?.totalEstimatedPayment ?? 0,
+      // A lead with no simulation attached isn't an "invalid" simulation - it
+      // just doesn't have one. isValid here only ever drove the (unrelated)
+      // simulator's inline error banner, which no DRAFT-lead view renders.
       isValid: true,
     },
     status: APPLICATION_STATUS_LABELS[app.status] as ApplicationStatus,

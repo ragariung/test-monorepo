@@ -162,10 +162,13 @@ export interface BackendInboxRow {
   referenceNo: string;
   status: BackendApplicationStatus;
   applicantFullName: string;
-  applicantEmail: string;
-  applicantPhone: string;
-  applicantAge: number;
-  applicantCity: string;
+  // Nullable: a DRAFT lead (see leads.controller.ts) may not have all of
+  // these yet - only applicantFullName + at least one of email/phone are
+  // guaranteed. Every SUBMITTED application still always has all of them.
+  applicantEmail: string | null;
+  applicantPhone: string | null;
+  applicantAge: number | null;
+  applicantCity: string | null;
   submittedAt: string;
   product: { id: string; name: string };
   assignedTo: { id: string; fullName: string } | null;
@@ -179,13 +182,17 @@ export interface BackendApplicationDetail {
   referenceNo: string;
   status: BackendApplicationStatus;
   applicantFullName: string;
-  applicantEmail: string;
-  applicantPhone: string;
-  applicantAge: number;
-  applicantCity: string;
-  preferredContactTime: BackendContactTime;
+  // Nullable: a DRAFT lead (see leads.controller.ts) may not have all of
+  // these yet - only applicantFullName + at least one of email/phone are
+  // guaranteed. Every SUBMITTED application still always has all of them.
+  applicantEmail: string | null;
+  applicantPhone: string | null;
+  applicantAge: number | null;
+  applicantCity: string | null;
+  preferredContactTime: BackendContactTime | null;
   applicantNotes: string | null;
   productSnapshot: { id: string; slug: string; name: string; categoryLabel: string };
+  // Null for a lead with no simulation run attached.
   simulationSnapshot: {
     sumAssured: number | null;
     paymentTermYears: number | null;
@@ -196,7 +203,7 @@ export interface BackendApplicationDetail {
     annualPremium: number | null;
     totalEstimatedPayment: number | null;
     disclaimer: string;
-  };
+  } | null;
   rejectionReason: string | null;
   submittedAt: string;
   updatedAt: string;
