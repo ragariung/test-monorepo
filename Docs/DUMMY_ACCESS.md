@@ -57,20 +57,20 @@ Source of truth: `Backends/src/auth/role-permissions.ts`. "Can" below means an A
 **Can't:** nothing.
 
 ### Underwriter Manager
-**Can:** view the application inbox/detail/dashboard; start review, approve, reject (with reason), assign/reassign applications; add internal notes; create/edit/publish/archive products; create and activate simulation-rule versions; manage users and change reporting-manager relationships (cycle-checked); view the audit log.
+**Can:** view the application inbox/detail/dashboard; start review, approve, reject (with reason), assign/reassign applications; add internal notes; edit/convert/decline `DRAFT` leads (`applications:manage_lead` — see below); create/edit/publish/archive products; create and activate simulation-rule versions; manage users and change reporting-manager relationships (cycle-checked); view the audit log.
 **Can't:** nothing among currently implemented endpoints — functionally equal to Admin today. (Difference from Admin: this role's permissions are an explicit list, not a wildcard, so a *future* endpoint with a new permission string would need to be added to this role explicitly — Admin would get it automatically.)
 
 ### Senior Underwriter
-**Can:** view inbox/detail/dashboard; start review, approve, reject, assign; add internal notes; view the audit log.
+**Can:** view inbox/detail/dashboard; start review, approve, reject, assign; add internal notes; edit/convert/decline `DRAFT` leads; view the audit log.
 **Can't:** create/edit/publish/archive products; create or activate simulation-rule versions; manage users or reporting-manager relationships.
 
 ### Underwriter
-**Can:** view inbox/detail/dashboard; start review (`SUBMITTED → UNDER_REVIEW`); add internal notes; view the audit log.
+**Can:** view inbox/detail/dashboard; start review (`SUBMITTED → UNDER_REVIEW`); add internal notes; edit/convert/decline `DRAFT` leads; view the audit log.
 **Can't:** approve or reject applications; assign/reassign applications; touch products, simulation rules, users, or organization.
 
 ### Tele-Consultant
-**Can:** view inbox/detail/dashboard; add internal notes.
-**Can't:** start review, approve, reject, or assign applications; view the audit log; touch products, simulation rules, users, or organization.
+**Can:** view inbox/detail/dashboard; add internal notes; edit/convert/decline `DRAFT` leads — a `DRAFT` lead is exactly the "call the prospect, confirm details, submit" work this role is for (see `applications:manage_lead` in `role-permissions.ts`).
+**Can't:** start review, approve, reject, or assign a formally `SUBMITTED`/`UNDER_REVIEW` application; view the audit log; touch products, simulation rules, users, or organization.
 
 ### Auditor (read-only)
 **Can:** view inbox/detail/dashboard; view all products (admin list); view simulation-rule versions; view the audit log.

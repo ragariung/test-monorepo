@@ -287,6 +287,56 @@
             "url": "{{baseUrl}}/admin/applications/{{applicationId}}/notes",
             "description": "Requires applications:note (deliberately excludes the read-only AUDITOR role)."
           }
+        },
+        {
+          "name": "Edit a DRAFT lead",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"applicant\": {\n    \"phone\": \"+62 812-0000-1111\",\n    \"notes\": \"Dikonfirmasi via telepon.\"\n  },\n  \"simulation\": {\n    \"age\": 35,\n    \"sumAssured\": 500000000,\n    \"paymentTermYears\": 10,\n    \"paymentFrequency\": \"MONTHLY\"\n  }\n}"
+            },
+            "url": "{{baseUrl}}/admin/applications/{{applicationId}}/lead",
+            "description": "Requires applications:manage_lead. DRAFT only (409 otherwise). Every field optional/partial - productId, applicant.*, simulation (if given, re-runs the real SimulationEngine, never hand-typed premiums)."
+          }
+        },
+        {
+          "name": "Convert a lead to a formal application",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/admin/applications/{{applicationId}}/convert",
+            "description": "Requires applications:manage_lead. DRAFT -> SUBMITTED, once staff have confirmed the lead by phone. 400 if no simulation is attached yet (edit the lead first)."
+          }
+        },
+        {
+          "name": "Decline a lead",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Prospek tidak dapat dihubungi setelah beberapa kali percobaan.\"\n}"
+            },
+            "url": "{{baseUrl}}/admin/applications/{{applicationId}}/decline-lead",
+            "description": "Requires applications:manage_lead. DRAFT -> REJECTED, for a lead that never became a formal application. reason is mandatory. Separate from Reject above (which only applies to a formally SUBMITTED/UNDER_REVIEW application)."
+          }
         }
       ]
     },

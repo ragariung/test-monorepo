@@ -8,7 +8,10 @@ export type ProductCategory =
 
 export type ProductStatus = 'Draft' | 'Published' | 'Archived';
 
-export type ApplicationStatus = 'Submitted' | 'Under Review' | 'Approved' | 'Rejected';
+// 'Draft' = a lead captured by the chatbot (Automation/) that hasn't been
+// converted into a formal application yet - see ApplicationsService.createLead()
+// and the admin lead-management actions (updateLead/convertLead/declineLead).
+export type ApplicationStatus = 'Draft' | 'Submitted' | 'Under Review' | 'Approved' | 'Rejected';
 
 export type PaymentFrequency = 'Bulanan' | 'Triwulanan' | 'Semesteran' | 'Tahunan';
 
@@ -121,6 +124,11 @@ export interface ApplicationRecord {
     categoryLabel: string;
   };
   simulation: SimulationResult;
+  // False for a DRAFT lead with no simulation ever attached - `simulation`
+  // above is still populated with zeros in that case (existing type/shape
+  // shared with the public simulator, which always has a real one), so views
+  // must check this before treating those numbers as a real quote.
+  hasSimulation: boolean;
   status: ApplicationStatus;
   assignedTo?: string; // staff user id or name
   rejectionReason?: string;

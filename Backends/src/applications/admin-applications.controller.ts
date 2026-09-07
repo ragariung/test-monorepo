@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionsGuard } from '../auth/permissions.guard';
 import { RequirePermission } from '../auth/require-permission.decorator';
@@ -9,6 +9,8 @@ import { QueryApplicationsDto } from './dto/query-applications.dto';
 import { RejectApplicationDto } from './dto/reject-application.dto';
 import { AssignApplicationDto } from './dto/assign-application.dto';
 import { AddNoteDto } from './dto/add-note.dto';
+import { UpdateLeadDto } from './dto/update-lead.dto';
+import { DeclineLeadDto } from './dto/decline-lead.dto';
 
 @Controller('admin/applications')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
@@ -72,5 +74,34 @@ export class AdminApplicationsController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.applicationsService.addNote(id, dto, user);
+  }
+
+  @Patch(':id/lead')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermission('applications:manage_lead')
+  updateLead(
+    @Param('id') id: string,
+    @Body() dto: UpdateLeadDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.applicationsService.updateLead(id, dto, user);
+  }
+
+  @Post(':id/convert')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermission('applications:manage_lead')
+  convertLead(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.applicationsService.convertLeadToApplication(id, user);
+  }
+
+  @Post(':id/decline-lead')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermission('applications:manage_lead')
+  declineLead(
+    @Param('id') id: string,
+    @Body() dto: DeclineLeadDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.applicationsService.declineLead(id, dto, user);
   }
 }
