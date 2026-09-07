@@ -19,24 +19,70 @@ This is a business-process **MVP prototype**, not a production purchasing/underw
 
 ## Running locally
 
+Everything (Postgres, backend, frontend, n8n) runs via one `docker-compose.yml` — no local Node/Postgres install needed, only Docker.
+
+**Prerequisites:** Docker + Docker Compose. A free Google Gemini API key if you also want the chatbot working end-to-end (step 5 below) — get one at [aistudio.google.com](https://aistudio.google.com/), no credit card required.
+
+### 1. Start all four services
+
 ```
 docker compose up --build
 ```
 
-Starts Postgres (`:5432`), the backend (`:3001`), the frontend (`:3000`), and n8n (`:5678`). First run only, apply migrations and seed demo data into the backend container:
+Leave this running in its own terminal (or add `-d` to detach). It starts, in dependency order:
+
+| Service | Port | What it is |
+|---|---|---|
+| `postgres` | `5432` | The database — everything else waits on its healthcheck before starting |
+| `backend` | `3001` | NestJS API (`Backends/`) |
+| `frontend` | `3000` | React app (`Frontends/`) — the public site + admin portal |
+| `n8n` | `5678` | Self-hosted n8n (`Automation/`) — runs the chatbot workflow |
+
+### 2. Set up the database (first run only)
+
+In a second terminal, once `backend` has started:
 
 ```
 docker compose exec backend npm run prisma:migrate
 docker compose exec backend npm run prisma:seed
 ```
 
-...and import the committed n8n workflow (see [`Automation/README.md`](Automation/README.md) for the one-time Gemini API key setup this also needs):
+The first command applies every migration in `Backends/prisma/migrations/`; the second seeds demo staff users, products, simulation rules, and sample applications. Re-run `prisma:seed` any time you want to reset the demo data back to its starting state (it's not idempotent-additive — check `Backends/prisma/seed.ts` if you're unsure what it does to existing rows).
+
+At this point the core app already works: open `http://localhost:3000` for the public site, or `http://localhost:3000/admin/login` for the admin portal (see step 4 for logins). The chatbot widget will be visible bottom-right but won't reply yet — that needs steps 3-5.
+
+### 3. Import the n8n workflow (first run only)
 
 ```
 ./Automation/scripts/import-workflows.sh
 ```
 
+This loads the committed `Automation/workflows/praxis-assistant-001.json` into your n8n instance. It's still not usable yet — n8n needs a one-time, by-hand setup that can't be scripted (next step).
+
+### 4. One-time n8n setup (owner account + Gemini credential + activate)
+
+Open `http://localhost:5678`:
+
+1. **Create the owner account.** First visit only, n8n shows a setup screen (email + password) — this is n8n's actual login mechanism, not a shared/seeded credential. Stored in the `n8n_data` volume, so you won't see this again unless the volume is wiped.
+2. **Add your Gemini API key as a credential.** In the n8n UI: **Credentials → New → Google Gemini(PaLM) Api** → paste the key from aistudio.google.com → save. Then open the **PRAXIS Assistant** workflow → the **Google Gemini Chat Model** node → select that credential from its dropdown.
+3. **Activate the workflow.** Open **PRAXIS Assistant** → toggle **Active** (top right).
+
+Full detail (including why these three steps can't be scripted, and the CLI alternative to step 3) is in [`Automation/README.md`](Automation/README.md).
+
+### 5. Verify everything works
+
+| Check | How |
+|---|---|
+| Public site | `http://localhost:3000` loads, products list |
+| Admin portal | `http://localhost:3000/admin/login` — see logins below |
+| Backend health | `curl http://localhost:3001/api/v1/health` → `{"status":"ok"}` |
+| Chatbot | Click the chat bubble bottom-right on the public site, ask "produk apa saja yang tersedia?" — should get a real, grounded answer |
+
 Demo admin logins: any seeded staff email (e.g. `sarah.wijaya@praxis.co.id`) with password `praxis123` — full list with per-role capabilities in [`Docs/DUMMY_ACCESS.md`](Docs/DUMMY_ACCESS.md).
+
+### Stopping / resetting
+
+`docker compose down` stops everything, keeping all data (Postgres + n8n) in their named volumes. Add `-v` (`docker compose down -v`) to also wipe those volumes — you'll need to redo steps 2-4 from scratch afterward (fresh database, fresh n8n instance with no owner account or credential).
 
 ## Docs
 
