@@ -6,7 +6,7 @@ This is a business-process **MVP prototype**, not a production purchasing/underw
 
 ## Status
 
-🔌 **Mostly wired, plus a working chatbot.** [`Backends/`](Backends/) is a real, implemented, and verified NestJS + Prisma API. [`Frontends/`](Frontends/) ("PRAXIS Insurance") now calls it for real for: the entire public conversion funnel (browse → simulate → apply → submit), admin login/logout/session restore, the application review workflow (inbox, detail, start-review/approve/reject, assignment, internal notes, CSV export), and the dashboard. Still running on mock data ([`src/data/mockData.ts`](Frontends/src/data/mockData.ts)): Product CMS edits, Simulation Rules management, and Organization/Users management. [`Automation/`](Automation/) runs a self-hosted n8n instance with the "PRAXIS Assistant" workflow — answers prospect product questions grounded in real `Backends/` data (with memory across turns) and captures interested leads via `POST /leads`; a floating `ChatWidget` on every public page (`Frontends/src/components/common/ChatWidget.tsx`) talks to it directly. See [`Docs/DATA-STRUCTURE.md`](Docs/DATA-STRUCTURE.md) for exactly what's wired vs. mock, and [`Docs/API-COLLECTION.postman.json`](Docs/API-COLLECTION.postman.json) to exercise the full API directly. [`docker-compose.yml`](docker-compose.yml) runs all four services (frontend, backend, Postgres, n8n) together locally.
+🔌 **Mostly wired, plus a working chatbot.** [`Backends/`](Backends/) is a real, implemented, and verified NestJS + Prisma API. [`Frontends/`](Frontends/) ("PRAXIS Insurance") now calls it for real for: the entire public conversion funnel (browse → simulate → apply → submit), admin login/logout/session restore, the application review workflow (inbox, detail, start-review/approve/reject/assign/edit-lead/convert-lead/decline-lead, internal notes, CSV export), the dashboard, and organization management (employee list, invite, manager-hierarchy reassignment, a live role-permission matrix). Still running on mock data ([`src/data/mockData.ts`](Frontends/src/data/mockData.ts)): Product CMS edits and Simulation Rules management. [`Automation/`](Automation/) runs a self-hosted n8n instance with the "PRAXIS Assistant" workflow — answers prospect product questions grounded in real `Backends/` data (with memory across turns), runs real premium simulations, and captures interested leads via `POST /leads`; a floating `ChatWidget` on every public page (`Frontends/src/components/common/ChatWidget.tsx`) talks to it directly. See [`Docs/DATA-STRUCTURE.md`](Docs/DATA-STRUCTURE.md) for exactly what's wired vs. mock, and [`Docs/API-COLLECTION.postman.json`](Docs/API-COLLECTION.postman.json) to exercise the full API directly. [`docker-compose.yml`](docker-compose.yml) runs all four services (frontend, backend, Postgres, n8n) together locally.
 
 ## Stack
 
@@ -19,7 +19,7 @@ This is a business-process **MVP prototype**, not a production purchasing/underw
 
 ## Running locally
 
-Everything (Postgres, backend, frontend, n8n) runs via one `docker-compose.yml` — no local Node/Postgres install needed, only Docker.
+I value your time, so everything (Postgres, backend, frontend, n8n) runs via one `docker-compose.yml` — no local Node/Postgres install needed, only Docker.
 
 **Prerequisites:** Docker + Docker Compose. A free Google Gemini API key if you also want the chatbot working end-to-end (step 5 below) — get one at [aistudio.google.com](https://aistudio.google.com/), no credit card required.
 
@@ -118,4 +118,4 @@ insurance-mvp/
 
 **Admin:** login → dashboard → application inbox/detail → status workflow (`SUBMITTED → UNDER_REVIEW → APPROVED/REJECTED`) → assignment via manager hierarchy → product CMS → simulation rule versioning → audit log.
 
-Explicitly out of scope for this MVP: policy issuance, payments, KYC, medical underwriting, claims processing, mobile apps. Full list in [`Docs/PRD.md`](Docs/PRD.md) §6.
+Explicitly out of scope for this MVP: policy issuance, payments,Full KYC verification, full medical underwriting, claims processing, mobile apps. Full list in [`Docs/PRD.md`](Docs/PRD.md) §6.

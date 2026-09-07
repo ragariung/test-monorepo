@@ -52,28 +52,30 @@ Manager chain demonstrated: **Rangga Pradipta → Sarah Wijaya → Bambang Soedi
 
 Source of truth: `Backends/src/auth/role-permissions.ts`. "Can" below means an API call actually succeeds (200/201); "Can't" means it returns 403.
 
+**Two separate dimensions, as of 2026-09-07:** which *endpoints* a role can call (the permission strings below) is one thing; which *rows* a `GET /admin/applications`/`GET /admin/applications/:id` call actually returns is another. `ADMIN`, `UNDERWRITER MANAGER`, and `AUDITOR` see every application regardless of assignment. `SENIOR UNDERWRITER`, `UNDERWRITER`, and `TELE-CONSULTANT` only see applications currently assigned to them - **except** `DRAFT` leads, which stay visible to all of them regardless of assignment (a lead from the chatbot is never pre-assigned to anyone; it's meant to be an unclaimed pool any of these three can pick up and work via `applications:manage_lead`). See `API-LIST-V0.md`'s matching revision row for the full detail and why the two "always unrestricted" exceptions exist.
+
 ### Admin
-**Can:** everything — every endpoint in `API-LIST-V0.md` (`*` permission).
+**Can:** everything — every endpoint in `API-LIST-V0.md` (`*` permission). Sees every application, unrestricted.
 **Can't:** nothing.
 
 ### Underwriter Manager
-**Can:** view the application inbox/detail/dashboard; start review, approve, reject (with reason), assign/reassign applications; add internal notes; edit/convert/decline `DRAFT` leads (`applications:manage_lead` — see below); create/edit/publish/archive products; create and activate simulation-rule versions; manage users and change reporting-manager relationships (cycle-checked); view the audit log.
+**Can:** view the application inbox/detail/dashboard; start review, approve, reject (with reason), assign/reassign applications; add internal notes; edit/convert/decline `DRAFT` leads (`applications:manage_lead` — see below); create/edit/publish/archive products; create and activate simulation-rule versions; manage users and change reporting-manager relationships (cycle-checked); view the audit log. Sees every application, unrestricted — same as Admin, since they're the one doing the assigning/reviewing across the whole team.
 **Can't:** nothing among currently implemented endpoints — functionally equal to Admin today. (Difference from Admin: this role's permissions are an explicit list, not a wildcard, so a *future* endpoint with a new permission string would need to be added to this role explicitly — Admin would get it automatically.)
 
 ### Senior Underwriter
-**Can:** view inbox/detail/dashboard; start review, approve, reject, assign; add internal notes; edit/convert/decline `DRAFT` leads; view the audit log.
-**Can't:** create/edit/publish/archive products; create or activate simulation-rule versions; manage users or reporting-manager relationships.
+**Can:** view inbox/detail/dashboard *for applications assigned to them, plus all `DRAFT` leads*; start review, approve, reject, assign; add internal notes; edit/convert/decline `DRAFT` leads; view the audit log.
+**Can't:** create/edit/publish/archive products; create or activate simulation-rule versions; manage users or reporting-manager relationships; view or act on a formally submitted application that isn't assigned to them (403).
 
 ### Underwriter
-**Can:** view inbox/detail/dashboard; start review (`SUBMITTED → UNDER_REVIEW`); add internal notes; edit/convert/decline `DRAFT` leads; view the audit log.
-**Can't:** approve or reject applications; assign/reassign applications; touch products, simulation rules, users, or organization.
+**Can:** view inbox/detail/dashboard *for applications assigned to them, plus all `DRAFT` leads*; start review (`SUBMITTED → UNDER_REVIEW`); add internal notes; edit/convert/decline `DRAFT` leads; view the audit log.
+**Can't:** approve or reject applications; assign/reassign applications; touch products, simulation rules, users, or organization; view or act on a formally submitted application that isn't assigned to them (403).
 
 ### Tele-Consultant
-**Can:** view inbox/detail/dashboard; add internal notes; edit/convert/decline `DRAFT` leads — a `DRAFT` lead is exactly the "call the prospect, confirm details, submit" work this role is for (see `applications:manage_lead` in `role-permissions.ts`).
-**Can't:** start review, approve, reject, or assign a formally `SUBMITTED`/`UNDER_REVIEW` application; view the audit log; touch products, simulation rules, users, or organization.
+**Can:** view inbox/detail/dashboard *for applications assigned to them, plus all `DRAFT` leads*; add internal notes; edit/convert/decline `DRAFT` leads — a `DRAFT` lead is exactly the "call the prospect, confirm details, submit" work this role is for (see `applications:manage_lead` in `role-permissions.ts`).
+**Can't:** start review, approve, reject, or assign a formally `SUBMITTED`/`UNDER_REVIEW` application; view the audit log; touch products, simulation rules, users, or organization; view a formally submitted application that isn't assigned to them (403).
 
 ### Auditor (read-only)
-**Can:** view inbox/detail/dashboard; view all products (admin list); view simulation-rule versions; view the audit log.
+**Can:** view inbox/detail/dashboard; view all products (admin list); view simulation-rule versions; view the audit log. Sees every application, unrestricted — nothing is ever "assigned" to an auditor, so scoping this role the same as the others would leave it permanently unable to see anything, defeating its entire compliance-oversight purpose.
 **Can't:** add notes; start review, approve, reject, or assign applications; create/edit/publish/archive products; create or activate simulation-rule versions; manage users or organization. Deliberately zero mutation permissions — see `DATA-STRUCTURE.md` §2.0 for why this role exists (PRD.md §5's "Read-only / Auditor" requirement).
 
 ### Anyone, unauthenticated (public)

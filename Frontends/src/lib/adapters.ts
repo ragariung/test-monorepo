@@ -5,6 +5,7 @@
  * the full list of naming/enum differences this bridges.
  */
 import {
+  BackendAlcoholUse,
   BackendApplicationDetail,
   BackendApplicationStatus,
   BackendAuditLogRow,
@@ -15,6 +16,7 @@ import {
   BackendProductCategory,
   BackendProductDocument,
   BackendSimulationResult,
+  BackendSmokingStatus,
   BackendStaffRole,
 } from './api';
 import {
@@ -48,9 +50,24 @@ export function roleLabel(role: BackendStaffRole): StaffUser['role'] {
   return ROLE_LABELS[role] ?? (role as StaffUser['role']);
 }
 
+// [backend enum value, frontend label] pairs, in the same fixed display
+// order as ROLE_LABELS - used to build the role <select> in OrganizationView's
+// "invite employee" form and the capability matrix's column order.
+export const STAFF_ROLE_OPTIONS: [BackendStaffRole, StaffUser['role']][] = (
+  Object.entries(ROLE_LABELS) as [BackendStaffRole, StaffUser['role']][]
+);
+
 /** managerId->fullName lookup must be built from the full users list first (see AppContext). */
 export function adaptUser(
-  user: { id: string; email: string; fullName: string; role: BackendStaffRole; department: string | null; managerId: string | null },
+  user: {
+    id: string;
+    email: string;
+    fullName: string;
+    role: BackendStaffRole;
+    department: string | null;
+    managerId: string | null;
+    isActive: boolean;
+  },
   managerNameById: Map<string, string>,
 ): StaffUser {
   return {
@@ -59,9 +76,10 @@ export function adaptUser(
     email: user.email,
     role: roleLabel(user.role),
     department: user.department ?? '',
-    assignedCount: 0, // not tracked by the backend in v0; only used by the not-yet-wired OrganizationView
+    assignedCount: 0, // not tracked by the backend in v0
     managerId: user.managerId ?? undefined,
     managerName: user.managerId ? managerNameById.get(user.managerId) : undefined,
+    isActive: user.isActive,
   };
 }
 
@@ -142,6 +160,18 @@ const CONTACT_TIME_LABELS: Record<BackendApplicationDetail['preferredContactTime
   MORNING: 'Pagi (09.00 - 12.00 WIB)',
   AFTERNOON: 'Siang (13.00 - 17.00 WIB)',
   EVENING: 'Malam (19.00 - 21.00 WIB)',
+};
+
+const SMOKING_STATUS_LABELS: Record<BackendSmokingStatus, NonNullable<ApplicantData['smokingStatus']>> = {
+  NEVER: 'Tidak Pernah',
+  FORMER: 'Mantan Perokok',
+  CURRENT: 'Perokok Aktif',
+};
+
+const ALCOHOL_USE_LABELS: Record<BackendAlcoholUse, NonNullable<ApplicantData['alcoholUse']>> = {
+  NEVER: 'Tidak Pernah',
+  OCCASIONAL: 'Sesekali',
+  REGULAR: 'Rutin',
 };
 
 function formatWIB(iso: string): string {
@@ -237,6 +267,12 @@ export function adaptApplicationDetail(app: BackendApplicationDetail): Applicati
       email: app.applicantEmail ?? '',
       phone: app.applicantPhone ?? '',
       age: app.applicantAge ?? 0,
+      dob: app.applicantDob?.slice(0, 10),
+      heightCm: app.applicantHeightCm ?? undefined,
+      weightKg: app.applicantWeightKg ?? undefined,
+      smokingStatus: app.smokingStatus ? SMOKING_STATUS_LABELS[app.smokingStatus] : undefined,
+      alcoholUse: app.alcoholUse ? ALCOHOL_USE_LABELS[app.alcoholUse] : undefined,
+      medicalHistory: app.medicalHistory ?? undefined,
       city: app.applicantCity ?? '',
       preferredContactTime: app.preferredContactTime
         ? CONTACT_TIME_LABELS[app.preferredContactTime]
@@ -320,6 +356,18 @@ export const CONTACT_TIME_TO_BACKEND: Record<ApplicantData['preferredContactTime
   'Pagi (09.00 - 12.00 WIB)': 'MORNING',
   'Siang (13.00 - 17.00 WIB)': 'AFTERNOON',
   'Malam (19.00 - 21.00 WIB)': 'EVENING',
+};
+
+export const SMOKING_STATUS_TO_BACKEND: Record<NonNullable<ApplicantData['smokingStatus']>, BackendSmokingStatus> = {
+  'Tidak Pernah': 'NEVER',
+  'Mantan Perokok': 'FORMER',
+  'Perokok Aktif': 'CURRENT',
+};
+
+export const ALCOHOL_USE_TO_BACKEND: Record<NonNullable<ApplicantData['alcoholUse']>, BackendAlcoholUse> = {
+  'Tidak Pernah': 'NEVER',
+  Sesekali: 'OCCASIONAL',
+  Rutin: 'REGULAR',
 };
 
 /**

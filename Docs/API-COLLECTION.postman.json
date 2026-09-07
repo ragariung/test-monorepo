@@ -503,6 +503,15 @@
             "url": "{{baseUrl}}/admin/users/{{userId}}/manager",
             "description": "Requires organization:manage. Pass managerId: null to clear it. Server walks the proposed manager's own chain and rejects (400) any change that would create a cycle."
           }
+        },
+        {
+          "name": "Get role-permission matrix",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/admin/users/permissions",
+            "description": "Requires users:manage. Returns the real role-permissions.ts ROLE_PERMISSIONS map as-is (backend enum role -> array of permission strings, ADMIN's entry is literally ['*']) - what OrganizationView's capability matrix tab renders."
+          }
         }
       ]
     },

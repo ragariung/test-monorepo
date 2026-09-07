@@ -23,13 +23,23 @@ import { adaptApplicationDetail } from '../../lib/adapters';
 import { downloadCsv } from '../../lib/csv';
 
 export const ApplicationsInboxView: React.FC = () => {
-  const { applications, products, staffList, navigate, showToast } = useApp();
+  const { applications, products, staffList, currentUser, navigate, showToast } = useApp();
 
-  // Filters state
+  // Filters state - initial values read once from the URL's query string
+  // (?status=...&assignedTo=...), so a deep link like the dashboard's
+  // summary cards use (see AdminDashboardView) opens the inbox pre-filtered.
+  // "assignedTo=me" is a special token resolved here to the logged-in
+  // staff's own name, since the owner filter itself compares by name.
+  const initialParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+  const initialStatus = initialParams?.get('status');
+  const initialAssignedTo = initialParams?.get('assignedTo');
+
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedStatus, setSelectedStatus] = useState<string>('all');
+  const [selectedStatus, setSelectedStatus] = useState<string>(initialStatus || 'all');
   const [selectedProduct, setSelectedProduct] = useState<string>('all');
-  const [selectedOwner, setSelectedOwner] = useState<string>('all');
+  const [selectedOwner, setSelectedOwner] = useState<string>(
+    initialAssignedTo === 'me' ? currentUser?.name ?? 'all' : initialAssignedTo || 'all',
+  );
   const [isExporting, setIsExporting] = useState(false);
 
   // Pagination state

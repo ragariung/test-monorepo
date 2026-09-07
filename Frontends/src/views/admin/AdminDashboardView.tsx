@@ -59,8 +59,8 @@ export const AdminDashboardView: React.FC = () => {
         {/* 6 SUMMARY COUNT WIDGETS (EXPLICIT PROMPT REQUIREMENT) */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
           {/* 1. Submitted */}
-          <div 
-            onClick={() => navigate('/admin/applications')}
+          <div
+            onClick={() => navigate('/admin/applications?status=Submitted')}
             className="bg-white p-5 rounded-[24px] border border-gray-100 shadow-soft hover:shadow-soft-lg transition-all cursor-pointer"
           >
             <div className="flex items-center justify-between text-xs text-gray-400">
@@ -72,8 +72,8 @@ export const AdminDashboardView: React.FC = () => {
           </div>
 
           {/* 2. Under Review */}
-          <div 
-            onClick={() => navigate('/admin/applications')}
+          <div
+            onClick={() => navigate(`/admin/applications?status=${encodeURIComponent('Under Review')}`)}
             className="bg-white p-5 rounded-[24px] border border-gray-100 shadow-soft hover:shadow-soft-lg transition-all cursor-pointer"
           >
             <div className="flex items-center justify-between text-xs text-gray-400">
@@ -85,8 +85,8 @@ export const AdminDashboardView: React.FC = () => {
           </div>
 
           {/* 3. Approved */}
-          <div 
-            onClick={() => navigate('/admin/applications')}
+          <div
+            onClick={() => navigate('/admin/applications?status=Approved')}
             className="bg-white p-5 rounded-[24px] border border-gray-100 shadow-soft hover:shadow-soft-lg transition-all cursor-pointer"
           >
             <div className="flex items-center justify-between text-xs text-gray-400">
@@ -98,8 +98,8 @@ export const AdminDashboardView: React.FC = () => {
           </div>
 
           {/* 4. Rejected */}
-          <div 
-            onClick={() => navigate('/admin/applications')}
+          <div
+            onClick={() => navigate('/admin/applications?status=Rejected')}
             className="bg-white p-5 rounded-[24px] border border-gray-100 shadow-soft hover:shadow-soft-lg transition-all cursor-pointer"
           >
             <div className="flex items-center justify-between text-xs text-gray-400">
@@ -111,8 +111,8 @@ export const AdminDashboardView: React.FC = () => {
           </div>
 
           {/* 5. Assigned to me */}
-          <div 
-            onClick={() => navigate('/admin/applications')}
+          <div
+            onClick={() => navigate('/admin/applications?assignedTo=me')}
             className="bg-[#E6F0F1] p-5 rounded-[24px] border border-[#0F4C5C]/20 shadow-soft hover:shadow-soft-lg transition-all cursor-pointer"
           >
             <div className="flex items-center justify-between text-xs text-[#0F4C5C]">
@@ -126,8 +126,8 @@ export const AdminDashboardView: React.FC = () => {
           </div>
 
           {/* 6. Unassigned */}
-          <div 
-            onClick={() => navigate('/admin/applications')}
+          <div
+            onClick={() => navigate('/admin/applications?assignedTo=unassigned')}
             className="bg-white p-5 rounded-[24px] border border-gray-100 shadow-soft hover:shadow-soft-lg transition-all cursor-pointer"
           >
             <div className="flex items-center justify-between text-xs text-gray-400">
