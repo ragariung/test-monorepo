@@ -19,7 +19,7 @@ This is a business-process **MVP prototype**, not a production purchasing/underw
 
 ## Running locally
 
-Everything (Postgres, backend, frontend, n8n) runs via one `docker-compose.yml` — no local Node/Postgres install needed, only Docker.
+I value your time, so everything (Postgres, backend, frontend, n8n) runs via one `docker-compose.yml` — no local Node/Postgres install needed, only Docker.
 
 **Prerequisites:** Docker + Docker Compose. A free Google Gemini API key if you also want the chatbot working end-to-end (step 5 below) — get one at [aistudio.google.com](https://aistudio.google.com/), no credit card required.
 
@@ -118,4 +118,4 @@ insurance-mvp/
 
 **Admin:** login → dashboard → application inbox/detail → status workflow (`SUBMITTED → UNDER_REVIEW → APPROVED/REJECTED`) → assignment via manager hierarchy → product CMS → simulation rule versioning → audit log.
 
-Explicitly out of scope for this MVP: policy issuance, payments, KYC, medical underwriting, claims processing, mobile apps. Full list in [`Docs/PRD.md`](Docs/PRD.md) §6.
+Explicitly out of scope for this MVP: policy issuance, payments,Full KYC verification, full medical underwriting, claims processing, mobile apps. Full list in [`Docs/PRD.md`](Docs/PRD.md) §6.
