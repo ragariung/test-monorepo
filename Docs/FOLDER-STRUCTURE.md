@@ -10,6 +10,9 @@ Living documentation of this repository's actual folder/file layout. Companion t
 
 | Date | Change | Notes |
 |---|---|---|
+| 2026-09-07 | Added `Frontends/src/components/common/ChatWidget.tsx` and `Frontends/src/lib/chat-api.ts` | The actual chat UI for the "PRAXIS Assistant" workflow — a floating widget rendered on every public page (wired in `App.tsx`, not `admin/*`). Talks directly to n8n's Chat Trigger webhook (`VITE_CHAT_WEBHOOK_URL` in `docker-compose.yml`), not `Backends/` — kept in its own `lib/chat-api.ts` rather than `api.ts` since the contract and backend are different (see `Automation/README.md`). Session id is a `crypto.randomUUID()` persisted in `sessionStorage` (per-tab, matches the n8n workflow's now in-RAM-only memory — see next row). |
+| 2026-09-07 | Added a `Chat Memory` node to `Automation/workflows/praxis-assistant-001.json` | Multi-turn conversations need the agent to remember earlier turns in the same session (e.g. name given two messages ago); the workflow had no memory node until this change, so every message was answered in isolation. Uses n8n's `memoryBufferWindow` (in-RAM, keyed by the Chat Trigger's own `sessionId`, last 10 turns) — see `Automation/README.md`'s workflow diagram. |
+| 2026-09-07 | Added `Automation/` (self-hosted n8n) and `Backends/src/applications/leads.controller.ts` | New top-level folder for the "PRAXIS Assistant" chat workflow platform — see its own `Automation/README.md` and `DATA-STRUCTURE.md`/`API-LIST-V0.md`'s matching revision rows for the new `POST /leads` endpoint and schema change it required. `docker-compose.yml` got a new `n8n` service (image-only, no Dockerfile — same precedent as `postgres`). Key design choice: n8n's native Git-based Source Control feature requires a paid license, so workflow portability instead uses n8n's free CLI export/import, with exported JSON bind-mounted into `Automation/workflows/` so it's an ordinary git-tracked file — see `Automation/README.md` for the full mechanism. |
 | 2026-09-07 | Added `jsPDF` dependency; `Frontends/src/lib/csv.ts` and `receipt-pdf.ts` | Real CSV export (Applications Inbox) and a real PDF application receipt (public success page) — both were toast-only placeholders before, found via live testing. See `DATA-STRUCTURE.md`'s matching revision rows. |
 | 2026-09-06 | Added `Frontends/src/lib/` (`api.ts`, `adapters.ts`) | New API-client layer for the frontend↔backend wiring pass — see `DATA-STRUCTURE.md`'s matching revision row for what's actually wired vs. still mock. Also added `Docs/API-COLLECTION.postman.json` (Postman/Insomnia-importable collection covering every endpoint) and `Docs/product-knowledge/` (research/reference docs for the dummy product catalogue). |
 | 2026-09-06 | Removed `Frontends/src/components/common/QuickNavigator.tsx` | Dev/QA leftover from the AI-Studio/Lovable generation tool — a floating "Pratinjau Halaman" overlay rendered on every page (public and admin) exposing the full admin route map with no auth gate, and a dead link to a non-existent `/design-system` route. Not referenced anywhere in `PRD.md`/`ARCHITECTURE.md`. Removed its import + render call from `App.tsx` and deleted the file; verified the frontend still serves (HTTP 200, no console/HMR errors) with it gone. |
@@ -24,9 +27,10 @@ Living documentation of this repository's actual folder/file layout. Companion t
 ```
 insurance-mvp/
 ├── Docs/                     product, architecture, and process documentation
-├── Frontends/                React + Vite frontend app — auth/applications/dashboard/products wired to Backends/, rest still on mock data (see §2)
+├── Frontends/                React + Vite frontend app — auth/applications/dashboard/products/public funnel wired to Backends/, rest still on mock data (see §2)
 ├── Backends/                 NestJS + Prisma backend — real, implemented and verified (see §3)
-├── docker-compose.yml        wires postgres + backend + frontend together for local dev
+├── Automation/                self-hosted n8n ("PRAXIS Assistant" chat workflow) — see §4
+├── docker-compose.yml        wires postgres + backend + frontend + n8n together for local dev
 └── README.md                 project overview
 ```
 
@@ -52,6 +56,7 @@ Frontends/
     ├── types.ts             frontend-side data shapes — see Docs/DATA-STRUCTURE.md for drift vs. canonical schema
     ├── lib/
     │   ├── api.ts           typed fetch client, one function per Backends/ endpoint (see Docs/API-LIST-V0.md)
+    │   ├── chat-api.ts      typed client for the n8n "PRAXIS Assistant" chat webhook (Automation/) - separate from api.ts, different backend/contract
     │   ├── adapters.ts      converts backend response shapes into the frontend's existing mock-era types
     │   ├── csv.ts           minimal CSV escaping + real browser download (no library)
     │   └── receipt-pdf.ts   generates the real application-receipt PDF (jsPDF), client-side only
@@ -60,7 +65,7 @@ Frontends/
     ├── data/
     │   └── mockData.ts      still used for: simulation rule display data, and the public simulate/apply funnel (not yet wired)
     ├── components/
-    │   ├── common/          Navbar, Footer, Button, Modal, StatusChip, ToastContainer
+    │   ├── common/          Navbar, Footer, Button, Modal, StatusChip, ToastContainer, ChatWidget (public pages only)
     │   └── admin/           AdminLayout
     └── views/
         ├── public/          HomeView, CatalogueView, ProductDetailView, SimulatorView, ApplyView, SuccessView
@@ -94,14 +99,33 @@ Backends/
     ├── products/             public list/detail, admin CRUD + publish/archive
     ├── simulation-rules/     admin: list/create draft/activate rule versions
     ├── simulator/            POST /simulations + SimulationEngine (the real premium calculation)
-    ├── applications/         public create+submit, admin inbox/detail/workflow actions/dashboard summary
+    ├── applications/         public create+submit + lead capture (leads.controller.ts), admin inbox/detail/workflow actions/dashboard summary
     ├── audit/                AuditService (write) + admin GET /audit (read)
     └── health/               GET /health, GET /ready
 ```
 
 Full endpoint-by-endpoint detail lives in `API-LIST-V0.md`.
 
-## 4. `Docs/`
+## 4. `Automation/` (n8n — the "PRAXIS Assistant" chat workflow)
+
+```
+Automation/
+├── README.md              what n8n is for here, how to run it, Gemini API key setup, the git-portability mechanism
+├── .env.example            reference-only (same pattern as Backends/.env.example — not consumed by docker-compose.yml)
+├── workflows/               git-tracked exported workflow JSON — the actual portability mechanism (see README)
+│   └── praxis-assistant-001.json
+└── scripts/
+    ├── export-workflows.sh  writes workflow JSON here after editing in the n8n UI
+    └── import-workflows.sh  restores workflows from here on a fresh/different machine
+```
+
+No Dockerfile — uses the official `n8nio/n8n` image directly in `docker-compose.yml` (same precedent as the `postgres` service), pinned to `n8nio/n8n:2.37.10`. SQLite backing store, isolated in its own `n8n_data` named volume — not shared with the app's Postgres database. The Gemini API key (LLM provider) is stored as an n8n credential in its own encrypted store, not committed to git or put in `docker-compose.yml`.
+
+`praxis-assistant-001.json` is an AI Agent (`@n8n/n8n-nodes-langchain.agent`) with two tools attached (`toolHttpRequest` nodes calling `Backends/`'s `GET /products` and `POST /leads`) plus a Gemini chat model node — node types/versions and the `ai_languageModel`/`ai_tool` connection schema were confirmed against this exact pinned n8n version's own installed node source (not assumed from docs, which lag reality), then verified by importing into the running instance and round-tripping an export back out to confirm every node and connection survived intact.
+
+**`N8N_BASIC_AUTH_ACTIVE`/`_USER`/`_PASSWORD` are deprecated and non-functional in n8n v2** (confirmed live — requests succeeded with and without credentials) — not set in `docker-compose.yml`. n8n v2 uses its own built-in owner account instead, created via a one-time setup screen on first UI visit.
+
+## 5. `Docs/`
 
 ```
 Docs/
@@ -120,7 +144,7 @@ Docs/
 
 ---
 
-## 5. Naming notes
+## 6. Naming notes
 
 - `Frontends/` and `Backends/` deliberately use the same plural-generic naming convention — the frontend kept this name when its design-pass output was adopted, and the backend follows suit for consistency (see revision history above; it briefly went through `insurance-backend-mvp/` before being reverted).
 - Root folder casing (`insurance-mvp` vs `Insurance-mvp`) is inconsistent across earlier history in this project due to the OS's case-insensitive filesystem — they are the same directory, not a duplicate.

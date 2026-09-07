@@ -16,6 +16,7 @@ Access URLs, seeded demo accounts, and exactly what each role can and can't do. 
 | Health check | http://localhost:3001/api/v1/health |
 | Readiness check (DB connectivity) | http://localhost:3001/api/v1/ready |
 | PostgreSQL (for a DB client, not a browser) | `localhost:5432`, db `insurance`, user `app`, password `app` |
+| n8n ("PRAXIS Assistant" chat workflow) | `localhost:5678` — first visit creates your own owner login (no shared demo credential; see `Automation/README.md`) |
 
 Example login against the real API:
 

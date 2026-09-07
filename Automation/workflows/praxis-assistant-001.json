@@ -1,0 +1,299 @@
+{
+  "updatedAt": "2026-09-07T11:30:39.000Z",
+  "createdAt": "2026-09-07T09:56:53.696Z",
+  "id": "praxis-assistant-001",
+  "name": "PRAXIS Assistant",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "public": true,
+        "mode": "webhook",
+        "authentication": "none",
+        "options": {
+          "responseMode": "lastNode"
+        }
+      },
+      "id": "chat-trigger-01",
+      "name": "Chat Trigger",
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -160,
+        272
+      ],
+      "webhookId": "72ce3642-177d-4104-be42-558158ac11d4"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.chatInput }}",
+        "options": {
+          "systemMessage": "You are the PRAXIS Insurance assistant, embedded on the PRAXIS Insurance website as a live chat widget. Write like a warm, knowledgeable human customer service agent typing in a chat - plain conversational sentences and short paragraphs, the way a person actually types in WhatsApp or live chat. Never use markdown formatting of any kind: no **bold**, no ### headers, no bullet-point lists with * or -, no numbered lists, no emoji, no horizontal rules. If you need to list a few things, just say them in a sentence separated by commas, or as short plain lines - never with list symbols. Keep replies reasonably concise; don't dump every field from a tool result at once unless the prospect actually asked for full detail.\n\nAnswer ONLY using information returned by the 'Get PRAXIS Products' tool - never rely on outside knowledge, and never invent product details, prices, eligibility rules, or guarantees not present in the data it returns. If the question is unrelated to PRAXIS's own insurance products, respond with exactly this message and nothing else: 'Maaf, saya hanya dapat menjawab pertanyaan seputar produk asuransi PRAXIS.'\n\nIf the prospect wants to know how much a product would cost, or wants a personalized premium estimate, ask for whatever of these you don't already have: their age, desired sum assured (Uang Pertanggungan), desired payment term in years (Masa Pembayaran - must be one of the product's allowedPaymentTerms from Get PRAXIS Products), and payment frequency (Frekuensi Bayar: bulanan/triwulan/semesteran/tahunan). Then call the 'Simulate Premium' tool. If it returns isValid: false, explain the validationError to the prospect in plain language and ask them to adjust their input - never present an invalid simulation as a real quote. If isValid: true, relay the premium figures clearly and always make clear that real premiums are only determined through PRAXIS's official underwriting process, so this is an illustration, not a final price.\n\nIf the prospect clearly expresses interest in a specific product and wants to be contacted by a PRAXIS advisor, ask for their full name and at least one of email or phone number, then explicitly ask for permission: 'Bolehkah saya mendaftarkan Anda sebagai prospek agar tim PRAXIS dapat menghubungi Anda?' Only call the 'Capture Lead' tool after they have clearly said yes AND given their name plus at least one contact method. Never call that tool without that explicit consent having just been given in this conversation. (Any earlier premium simulation for this prospect is attached to their lead automatically - you don't need to reference or repeat it when calling Capture Lead.)"
+        }
+      },
+      "id": "agent-01",
+      "name": "AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.3,
+      "position": [
+        144,
+        272
+      ]
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-3.5-flash-lite",
+        "options": {}
+      },
+      "id": "gemini-lm-01",
+      "name": "Google Gemini Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        48,
+        480
+      ],
+      "credentials": {
+        "googlePalmApi": {
+          "id": "McfCtsED2yEwxGdr",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      },
+      "notes": "Credential not set - add a Google Gemini(PaLM) Api credential (free tier key from aistudio.google.com) and select it here. See Automation/README.md."
+    },
+    {
+      "parameters": {
+        "sessionIdType": "fromInput",
+        "contextWindowLength": 10
+      },
+      "id": "memory-01",
+      "name": "Chat Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.4,
+      "position": [
+        -8,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "toolDescription": "Fetches the current, real list of published PRAXIS Insurance products with full details: name, tagline, category, benefits, eligibility (age/sum-assured ranges), payment terms, and documents. Call this whenever you need real product information to answer a question - do not answer product questions without calling this first.",
+        "url": "http://backend:3001/api/v1/products"
+      },
+      "id": "tool-products-01",
+      "name": "Get PRAXIS Products",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [
+        224,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "toolDescription": "Registers a prospect as a lead for PRAXIS staff follow-up. Call this ONLY after the prospect has clearly expressed interest in a specific product, given their full name and at least an email or phone number, AND explicitly said yes to being contacted in this conversation. Never call this without that explicit consent. Any earlier premium simulation for this prospect is attached automatically - no need to reference it.",
+        "method": "POST",
+        "url": "http://backend:3001/api/v1/leads",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"productId\": \"{productId}\",\n  \"applicant\": {\n    \"fullName\": \"{fullName}\",\n    \"email\": \"{email}\",\n    \"phone\": \"{phone}\",\n    \"notes\": \"{notes}\"\n  },\n  \"consent\": true,\n  \"sessionId\": \"{{ $('Chat Trigger').item.json.sessionId }}\"\n}",
+        "placeholderDefinitions": {
+          "values": [
+            {
+              "name": "productId",
+              "description": "The id of the PRAXIS product the prospect is interested in, from the Get PRAXIS Products tool result",
+              "type": "string"
+            },
+            {
+              "name": "fullName",
+              "description": "The prospect full name",
+              "type": "string"
+            },
+            {
+              "name": "email",
+              "description": "The prospect email address, if given, otherwise leave as an empty string",
+              "type": "string"
+            },
+            {
+              "name": "phone",
+              "description": "The prospect phone number, if given, otherwise leave as an empty string",
+              "type": "string"
+            },
+            {
+              "name": "notes",
+              "description": "A short summary of what the prospect is interested in and any context from the conversation",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "id": "tool-lead-01",
+      "name": "Capture Lead",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [
+        400,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "toolDescription": "Runs an official PRAXIS premium illustration for a specific product. Call this when the prospect wants to know how much they'd pay, or before offering to register them if they'd like a personalized quote. Requires: which product (call Get PRAXIS Products first if you don't have its id), the prospect's age, desired sum assured (Uang Pertanggungan) in Rupiah, desired payment term in years (Masa Pembayaran - must be one of the product's allowedPaymentTerms), and payment frequency (Frekuensi Bayar). Returns isValid, the premium figures, and a simulationRunId - if isValid is false, explain the validationError to the prospect instead of presenting numbers as a real quote.",
+        "method": "POST",
+        "url": "http://backend:3001/api/v1/simulations",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"productId\": \"{productId}\",\n  \"age\": {age},\n  \"sumAssured\": {sumAssured},\n  \"paymentTermYears\": {paymentTermYears},\n  \"paymentFrequency\": \"{paymentFrequency}\",\n  \"sessionId\": \"{{ $('Chat Trigger').item.json.sessionId }}\"\n}",
+        "placeholderDefinitions": {
+          "values": [
+            {
+              "name": "productId",
+              "description": "The id of the PRAXIS product to simulate, from the Get PRAXIS Products tool result",
+              "type": "string"
+            },
+            {
+              "name": "age",
+              "description": "The prospect's age in whole years",
+              "type": "number"
+            },
+            {
+              "name": "sumAssured",
+              "description": "The desired sum assured (Uang Pertanggungan) in Indonesian Rupiah, e.g. 500000000 for Rp500 juta - must be within the product's minSumAssured/maxSumAssured range",
+              "type": "number"
+            },
+            {
+              "name": "paymentTermYears",
+              "description": "The desired payment term in years (Masa Pembayaran) - must be one of the product's allowedPaymentTerms",
+              "type": "number"
+            },
+            {
+              "name": "paymentFrequency",
+              "description": "Payment frequency (Frekuensi Bayar). Must be exactly one of: MONTHLY, QUARTERLY, SEMI_ANNUAL, ANNUAL. Map the prospect's Indonesian wording: bulanan to MONTHLY, triwulan/kuartalan to QUARTERLY, semesteran/6 bulanan to SEMI_ANNUAL, tahunan to ANNUAL.",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "id": "tool-simulate-01",
+      "name": "Simulate Premium",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [
+        576,
+        480
+      ]
+    }
+  ],
+  "connections": {
+    "AI Agent": {},
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chat Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get PRAXIS Products": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Capture Lead": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simulate Premium": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chat Trigger": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "nodeGroups": [],
+  "pinData": {},
+  "versionId": "c52af81e-000a-4ed8-afe1-869e71e4963a",
+  "activeVersionId": "c52af81e-000a-4ed8-afe1-869e71e4963a",
+  "versionCounter": 8,
+  "triggerCount": 1,
+  "sourceWorkflowId": null,
+  "tags": [],
+  "shared": [
+    {
+      "updatedAt": "2026-09-07T09:57:46.445Z",
+      "createdAt": "2026-09-07T09:57:46.445Z",
+      "role": "workflow:owner",
+      "workflowId": "praxis-assistant-001",
+      "projectId": "0tzCHu7YlQf0VHfd",
+      "project": {
+        "updatedAt": "2026-09-07T10:01:24.834Z",
+        "createdAt": "2026-09-07T09:57:40.639Z",
+        "id": "0tzCHu7YlQf0VHfd",
+        "name": "raga riung <ragariung@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "customTelemetryTags": [],
+        "creatorId": "07815990-66d9-4aa7-830e-33a97a5587b7"
+      }
+    }
+  ],
+  "versionMetadata": {
+    "name": "Version fee385b3",
+    "description": ""
+  }
+}

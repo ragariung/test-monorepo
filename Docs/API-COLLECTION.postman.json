@@ -6,11 +6,26 @@
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
-    { "key": "baseUrl", "value": "http://localhost:3001/api/v1" },
-    { "key": "applicationId", "value": "" },
-    { "key": "productId", "value": "" },
-    { "key": "userId", "value": "" },
-    { "key": "ruleVersionId", "value": "" }
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3001/api/v1"
+    },
+    {
+      "key": "applicationId",
+      "value": ""
+    },
+    {
+      "key": "productId",
+      "value": ""
+    },
+    {
+      "key": "userId",
+      "value": ""
+    },
+    {
+      "key": "ruleVersionId",
+      "value": ""
+    }
   ],
   "item": [
     {
@@ -18,11 +33,17 @@
       "item": [
         {
           "name": "Health",
-          "request": { "method": "GET", "url": "{{baseUrl}}/health" }
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/health"
+          }
         },
         {
           "name": "Ready (verifies Postgres connectivity)",
-          "request": { "method": "GET", "url": "{{baseUrl}}/ready" }
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/ready"
+          }
         }
       ]
     },
@@ -33,7 +54,12 @@
           "name": "Login",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"email\": \"sarah.wijaya@praxis.co.id\",\n  \"password\": \"praxis123\"\n}"
@@ -44,11 +70,17 @@
         },
         {
           "name": "Logout",
-          "request": { "method": "POST", "url": "{{baseUrl}}/auth/logout" }
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/auth/logout"
+          }
         },
         {
           "name": "Me (current session profile)",
-          "request": { "method": "GET", "url": "{{baseUrl}}/me" }
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/me"
+          }
         }
       ]
     },
@@ -57,36 +89,70 @@
       "item": [
         {
           "name": "List published products",
-          "request": { "method": "GET", "url": "{{baseUrl}}/products" }
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/products"
+          }
         },
         {
           "name": "Get product by slug",
-          "request": { "method": "GET", "url": "{{baseUrl}}/products/praxis-jiwa-utama" }
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/products/praxis-jiwa-utama"
+          }
         },
         {
           "name": "Run a simulation",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"productId\": \"{{productId}}\",\n  \"age\": 30,\n  \"sumAssured\": 1000000000,\n  \"paymentTermYears\": 10,\n  \"paymentFrequency\": \"MONTHLY\"\n}"
+              "raw": "{\n  \"productId\": \"{{productId}}\",\n  \"age\": 30,\n  \"sumAssured\": 1000000000,\n  \"paymentTermYears\": 10,\n  \"paymentFrequency\": \"MONTHLY\",\n  \"sessionId\": \"\"\n}"
             },
             "url": "{{baseUrl}}/simulations",
-            "description": "paymentFrequency is one of MONTHLY | QUARTERLY | SEMI_ANNUAL | ANNUAL. Set {{productId}} from a product list response first. Returns simulationRunId - copy it into the next request."
+            "description": "paymentFrequency is one of MONTHLY | QUARTERLY | SEMI_ANNUAL | ANNUAL. Set {{productId}} from a product list response first. Returns simulationRunId - copy it into the next request. Optional sessionId: only meaningful for the PRAXIS Assistant chat workflow (Automation/) - if set, POST /leads can later auto-attach this simulation by passing the same sessionId instead of the explicit simulationRunId. Leave blank/omit for a direct API call like this one."
           }
         },
         {
           "name": "Submit an application",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"productId\": \"{{productId}}\",\n  \"simulationRunId\": \"PASTE_FROM_SIMULATE_RESPONSE\",\n  \"applicant\": {\n    \"fullName\": \"Budi Santoso\",\n    \"email\": \"budi.santoso@example.com\",\n    \"phone\": \"+62 812-3456-7890\",\n    \"age\": 30,\n    \"city\": \"Jakarta Selatan\",\n    \"preferredContactTime\": \"AFTERNOON\",\n    \"notes\": \"Optional note from the applicant\"\n  },\n  \"consent\": true\n}"
             },
             "url": "{{baseUrl}}/applications",
             "description": "preferredContactTime is one of MORNING | AFTERNOON | EVENING. consent must be true or this returns 400. Creates the application already in SUBMITTED status (v0 simplification, see Docs/API-LIST-V0.md) and returns { id, referenceNo }."
+          }
+        },
+        {
+          "name": "Capture a lead (chat/assistant)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productId\": \"{{productId}}\",\n  \"applicant\": {\n    \"fullName\": \"Budi Santoso\",\n    \"phone\": \"+62 812-3456-7890\",\n    \"notes\": \"Interested via chat assistant\"\n  },\n  \"consent\": true,\n  \"simulationRunId\": \"\",\n  \"sessionId\": \"\"\n}"
+            },
+            "url": "{{baseUrl}}/leads",
+            "description": "Used by the PRAXIS Assistant n8n workflow (Automation/), not the public web form. Lighter than /applications: no simulation required. productId + consent: true are required; at least one of applicant.email/applicant.phone is required, everything else about the applicant (age, city, preferredContactTime, notes) is optional. Optional simulationRunId attaches a specific prior simulation (404 if it doesn't exist, 400 if it's for a different product) - or pass sessionId instead to auto-attach the most recent valid simulation for that session+product (silently skipped if none exists). Creates a DRAFT application. Returns { id, referenceNo }."
           }
         }
       ]
@@ -100,15 +166,45 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/admin/applications?page=1&pageSize=20",
-              "host": ["{{baseUrl}}"],
-              "path": ["admin", "applications"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "applications"
+              ],
               "query": [
-                { "key": "page", "value": "1" },
-                { "key": "pageSize", "value": "20" },
-                { "key": "status", "value": "UNDER_REVIEW", "disabled": true, "description": "DRAFT | SUBMITTED | UNDER_REVIEW | APPROVED | REJECTED" },
-                { "key": "productId", "value": "", "disabled": true },
-                { "key": "assignedTo", "value": "unassigned", "disabled": true, "description": "a user id, or the literal string 'unassigned'" },
-                { "key": "search", "value": "", "disabled": true, "description": "matches reference no / applicant name / email / phone" }
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "20"
+                },
+                {
+                  "key": "status",
+                  "value": "UNDER_REVIEW",
+                  "disabled": true,
+                  "description": "DRAFT | SUBMITTED | UNDER_REVIEW | APPROVED | REJECTED"
+                },
+                {
+                  "key": "productId",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "assignedTo",
+                  "value": "unassigned",
+                  "disabled": true,
+                  "description": "a user id, or the literal string 'unassigned'"
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "disabled": true,
+                  "description": "matches reference no / applicant name / email / phone"
+                }
               ]
             },
             "description": "Requires permission applications:read."
@@ -142,8 +238,16 @@
           "name": "Reject",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"reason\": \"Batas usia tertanggung melebihi ketentuan produk.\"\n}" },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Batas usia tertanggung melebihi ketentuan produk.\"\n}"
+            },
             "url": "{{baseUrl}}/admin/applications/{{applicationId}}/reject",
             "description": "Requires applications:reject. reason is mandatory (400 if blank). Allowed from SUBMITTED or UNDER_REVIEW; 409 otherwise."
           }
@@ -152,8 +256,16 @@
           "name": "Assign (or unassign)",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"userId\": \"{{userId}}\"\n}" },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{userId}}\"\n}"
+            },
             "url": "{{baseUrl}}/admin/applications/{{applicationId}}/assign",
             "description": "Requires applications:assign. Pass userId: null to unassign. Returns the full application detail."
           }
@@ -162,8 +274,16 @@
           "name": "Add internal note",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"content\": \"Contacted the applicant via WhatsApp to confirm identity documents.\"\n}" },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"content\": \"Contacted the applicant via WhatsApp to confirm identity documents.\"\n}"
+            },
             "url": "{{baseUrl}}/admin/applications/{{applicationId}}/notes",
             "description": "Requires applications:note (deliberately excludes the read-only AUDITOR role)."
           }
@@ -188,13 +308,22 @@
       "item": [
         {
           "name": "List all products (incl. drafts/archived)",
-          "request": { "method": "GET", "url": "{{baseUrl}}/admin/products", "description": "Requires products:read." }
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/admin/products",
+            "description": "Requires products:read."
+          }
         },
         {
           "name": "Create product",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"slug\": \"praxis-contoh-produk\",\n  \"name\": \"PRAXIS Contoh Produk\",\n  \"tagline\": \"Contoh tagline produk.\",\n  \"category\": \"LIFE\",\n  \"categoryLabel\": \"Proteksi Jiwa\",\n  \"summary\": \"Ringkasan produk.\",\n  \"targetAudience\": [\"Segmen A\", \"Segmen B\"],\n  \"minAge\": 18,\n  \"maxAge\": 60,\n  \"minSumAssured\": 100000000,\n  \"maxSumAssured\": 5000000000,\n  \"allowedPaymentTerms\": [5, 10, 15, 20],\n  \"coverageDurationYears\": 99,\n  \"baseAnnualRatePerMillion\": 18.5,\n  \"badge\": \"Baru\",\n  \"colorTone\": \"#0A3641\"\n}"
@@ -207,7 +336,12 @@
           "name": "Update product",
           "request": {
             "method": "PATCH",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"tagline\": \"Tagline yang diperbarui.\",\n  \"summary\": \"Ringkasan yang diperbarui.\"\n}"
@@ -218,11 +352,19 @@
         },
         {
           "name": "Publish product",
-          "request": { "method": "POST", "url": "{{baseUrl}}/admin/products/{{productId}}/publish", "description": "Requires products:publish." }
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/admin/products/{{productId}}/publish",
+            "description": "Requires products:publish."
+          }
         },
         {
           "name": "Archive product",
-          "request": { "method": "POST", "url": "{{baseUrl}}/admin/products/{{productId}}/archive", "description": "Requires products:publish." }
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/admin/products/{{productId}}/archive",
+            "description": "Requires products:publish."
+          }
         }
       ]
     },
@@ -231,13 +373,22 @@
       "item": [
         {
           "name": "List rule versions for a product",
-          "request": { "method": "GET", "url": "{{baseUrl}}/admin/products/{{productId}}/simulation-rules", "description": "Requires simulation_rules:read." }
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/admin/products/{{productId}}/simulation-rules",
+            "description": "Requires simulation_rules:read."
+          }
         },
         {
           "name": "Create a draft rule version",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"formulaConfig\": {\n    \"maxAgePlusTerm\": 75,\n    \"ageBands\": [\n      { \"min\": 18, \"max\": 30, \"factor\": 1.0 },\n      { \"min\": 31, \"max\": 40, \"factor\": 1.25 },\n      { \"min\": 41, \"max\": 50, \"factor\": 1.65 },\n      { \"min\": 51, \"max\": 60, \"factor\": 2.3 },\n      { \"min\": 61, \"max\": 65, \"factor\": 3.1 }\n    ],\n    \"termMultipliers\": [\n      { \"term\": 5, \"multiplier\": 1.0 },\n      { \"term\": 10, \"multiplier\": 0.95 },\n      { \"term\": 15, \"multiplier\": 0.91 },\n      { \"term\": 20, \"multiplier\": 0.86 }\n    ],\n    \"frequencyFactors\": {\n      \"MONTHLY\": 0.09,\n      \"QUARTERLY\": 0.26,\n      \"SEMI_ANNUAL\": 0.51,\n      \"ANNUAL\": 1.0\n    }\n  }\n}"
@@ -261,13 +412,22 @@
       "item": [
         {
           "name": "List all staff users",
-          "request": { "method": "GET", "url": "{{baseUrl}}/admin/users", "description": "Requires users:manage." }
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/admin/users",
+            "description": "Requires users:manage."
+          }
         },
         {
           "name": "Create staff user",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"email\": \"new.staff@praxis.co.id\",\n  \"fullName\": \"New Staff Member\",\n  \"role\": \"UNDERWRITER\",\n  \"department\": \"Life & Medical Assessment\",\n  \"managerId\": null,\n  \"password\": \"changeme123\"\n}"
@@ -280,8 +440,16 @@
           "name": "Change a user's manager",
           "request": {
             "method": "PATCH",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"managerId\": \"{{userId}}\"\n}" },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"managerId\": \"{{userId}}\"\n}"
+            },
             "url": "{{baseUrl}}/admin/users/{{userId}}/manager",
             "description": "Requires organization:manage. Pass managerId: null to clear it. Server walks the proposed manager's own chain and rejects (400) any change that would create a cycle."
           }
@@ -297,11 +465,25 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/admin/audit?search=&action=",
-              "host": ["{{baseUrl}}"],
-              "path": ["admin", "audit"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "audit"
+              ],
               "query": [
-                { "key": "search", "value": "", "disabled": true, "description": "matches description / actorLabel / entityId" },
-                { "key": "action", "value": "STATUS_UPDATE", "disabled": true }
+                {
+                  "key": "search",
+                  "value": "",
+                  "disabled": true,
+                  "description": "matches description / actorLabel / entityId"
+                },
+                {
+                  "key": "action",
+                  "value": "STATUS_UPDATE",
+                  "disabled": true
+                }
               ]
             },
             "description": "Requires audit:read. Append-only, capped at 200 most recent rows (v0 limitation, see audit.service.ts)."
