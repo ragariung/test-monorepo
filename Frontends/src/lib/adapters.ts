@@ -130,7 +130,7 @@ export function adaptProduct(p: BackendProduct): Product {
   };
 }
 
-const APPLICATION_STATUS_LABELS: Record<BackendApplicationStatus, ApplicationStatus | 'Draft'> = {
+const APPLICATION_STATUS_LABELS: Record<BackendApplicationStatus, ApplicationStatus> = {
   DRAFT: 'Draft',
   SUBMITTED: 'Submitted',
   UNDER_REVIEW: 'Under Review',
@@ -214,7 +214,8 @@ export function adaptInboxRow(row: BackendInboxRow): ApplicationRecord {
       totalEstimatedInvestment: 0,
       isValid: true,
     },
-    status: APPLICATION_STATUS_LABELS[row.status] as ApplicationStatus,
+    hasSimulation: row.sumAssured != null,
+    status: APPLICATION_STATUS_LABELS[row.status],
     assignedTo: row.assignedTo?.fullName,
     internalNotes: [],
     auditTrail: [],
@@ -268,7 +269,8 @@ export function adaptApplicationDetail(app: BackendApplicationDetail): Applicati
       // simulator's inline error banner, which no DRAFT-lead view renders.
       isValid: true,
     },
-    status: APPLICATION_STATUS_LABELS[app.status] as ApplicationStatus,
+    hasSimulation: sim != null,
+    status: APPLICATION_STATUS_LABELS[app.status],
     assignedTo: app.assignedTo?.fullName,
     rejectionReason: app.rejectionReason ?? undefined,
     internalNotes: app.notes.map((n) => ({

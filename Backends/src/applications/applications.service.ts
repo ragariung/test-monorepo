@@ -9,9 +9,11 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import { toNumber } from '../simulator/simulation.engine';
-import { SIMULATION_DISCLAIMER } from '../simulator/simulator.service';
+import { SIMULATION_DISCLAIMER, SimulatorService } from '../simulator/simulator.service';
 import { CreateApplicationDto } from './dto/create-application.dto';
 import { CreateLeadDto } from './dto/create-lead.dto';
+import { UpdateLeadDto } from './dto/update-lead.dto';
+import { DeclineLeadDto } from './dto/decline-lead.dto';
 import { QueryApplicationsDto } from './dto/query-applications.dto';
 import { RejectApplicationDto } from './dto/reject-application.dto';
 import { AssignApplicationDto } from './dto/assign-application.dto';
@@ -44,6 +46,7 @@ export class ApplicationsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly simulatorService: SimulatorService,
   ) {}
 
   // ---------------------------------------------------------------------
@@ -264,6 +267,146 @@ export class ApplicationsService {
     });
 
     return { id: application.id, referenceNo: application.referenceNo };
+  }
+
+  // ---------------------------------------------------------------------
+  // Admin: managing a DRAFT lead (edit / convert / decline)
+  // ---------------------------------------------------------------------
+
+  /**
+   * Staff editing a lead after calling the prospect - correct a contact
+   * detail, switch to a different product they actually want, or re-run the
+   * simulation with the numbers the prospect gave over the phone. Only ever
+   * touches fields actually present in dto (a partial update), and only
+   * while the lead is still DRAFT - once converted/submitted, this data is
+   * fixed, same as the formal funnel's applications always have been.
+   */
+  async updateLead(id: string, dto: UpdateLeadDto, actingUser: AuthenticatedUser) {
+    const application = await this.getApplicationOrThrow(id);
+
+    if (application.status !== ApplicationStatus.DRAFT) {
+      throw new ConflictException(
+        `Cannot edit a lead from status ${application.status} - only a DRAFT lead can be edited.`,
+      );
+    }
+
+    const nextEmail = dto.applicant?.email !== undefined ? dto.applicant.email : application.applicantEmail;
+    const nextPhone = dto.applicant?.phone !== undefined ? dto.applicant.phone : application.applicantPhone;
+    if (!nextEmail && !nextPhone) {
+      throw new BadRequestException('At least one of applicant.email or applicant.phone is required.');
+    }
+
+    const updateData: Prisma.ApplicationUpdateInput = {};
+    let productId = application.productId;
+
+    if (dto.productId && dto.productId !== application.productId) {
+      const product = await this.prisma.product.findUnique({ where: { id: dto.productId } });
+      if (!product) {
+        throw new NotFoundException('Product not found');
+      }
+      productId = product.id;
+      updateData.product = { connect: { id: product.id } };
+      updateData.productSnapshot = {
+        id: product.id,
+        slug: product.slug,
+        name: product.name,
+        categoryLabel: product.categoryLabel,
+      };
+    }
+
+    if (dto.applicant) {
+      const a = dto.applicant;
+      if (a.fullName !== undefined) updateData.applicantFullName = a.fullName;
+      if (a.email !== undefined) updateData.applicantEmail = a.email;
+      if (a.phone !== undefined) updateData.applicantPhone = a.phone;
+      if (a.age !== undefined) updateData.applicantAge = a.age;
+      if (a.city !== undefined) updateData.applicantCity = a.city;
+      if (a.preferredContactTime !== undefined) updateData.preferredContactTime = a.preferredContactTime;
+      if (a.notes !== undefined) updateData.applicantNotes = a.notes;
+    }
+
+    if (dto.simulation) {
+      // Re-runs the real engine (never hand-typed premiums) - same call the
+      // chatbot and the public simulator both go through.
+      const simResult = await this.simulatorService.runSimulation({
+        productId,
+        age: dto.simulation.age,
+        sumAssured: dto.simulation.sumAssured,
+        paymentTermYears: dto.simulation.paymentTermYears,
+        paymentFrequency: dto.simulation.paymentFrequency,
+      });
+      const simulationRun = await this.prisma.simulationRun.findUniqueOrThrow({
+        where: { id: simResult.simulationRunId },
+      });
+      updateData.simulationRun = { connect: { id: simulationRun.id } };
+      updateData.ruleVersion = { connect: { id: simulationRun.ruleVersionId } };
+      updateData.simulationSnapshot = this.buildSimulationSnapshot(simulationRun);
+    }
+
+    await this.prisma.application.update({ where: { id }, data: updateData });
+
+    const label = await this.actorLabel(actingUser.id);
+    await this.audit.log({
+      actorId: actingUser.id,
+      actorLabel: label,
+      action: 'LEAD_UPDATED',
+      entityType: 'Application',
+      entityId: id,
+      description: `Memperbarui data prospek ${dto.applicant?.fullName ?? application.applicantFullName} setelah dihubungi.`,
+    });
+
+    return this.detail(id);
+  }
+
+  /**
+   * Formally submits a DRAFT lead into the real review pipeline (start
+   * review / approve / reject) once staff have confirmed the details by
+   * phone. Requires a simulation to already be attached (from the chatbot
+   * or from updateLead()) - a formal application without a priced
+   * illustration doesn't make sense, same principle createAndSubmit()'s
+   * required simulationRunId already enforces for the public funnel.
+   */
+  async convertLeadToApplication(id: string, actingUser: AuthenticatedUser) {
+    const application = await this.getApplicationOrThrow(id);
+
+    if (application.status !== ApplicationStatus.DRAFT) {
+      throw new ConflictException(`Cannot convert from status ${application.status}`);
+    }
+    if (!application.simulationRunId) {
+      throw new BadRequestException(
+        'A premium simulation must be attached before converting this lead - edit the lead to add one first.',
+      );
+    }
+
+    return this.transitionStatus(application, ApplicationStatus.SUBMITTED, actingUser);
+  }
+
+  /**
+   * Closes out a DRAFT lead that didn't pan out (prospect no longer
+   * interested, unreachable, etc.) without ever having been a formal
+   * application - kept separate from reject() (which only accepts
+   * SUBMITTED/UNDER_REVIEW and requires applications:reject) since declining
+   * a lead that was never submitted is a much lower-stakes action than
+   * rejecting a real underwritten application.
+   */
+  async declineLead(id: string, dto: DeclineLeadDto, actingUser: AuthenticatedUser) {
+    if (!dto.reason || !dto.reason.trim()) {
+      throw new BadRequestException('reason is required');
+    }
+
+    const application = await this.getApplicationOrThrow(id);
+
+    if (application.status !== ApplicationStatus.DRAFT) {
+      throw new ConflictException(`Cannot decline from status ${application.status}`);
+    }
+
+    return this.transitionStatus(
+      application,
+      ApplicationStatus.REJECTED,
+      actingUser,
+      { rejectedAt: new Date(), rejectionReason: dto.reason },
+      dto.reason,
+    );
   }
 
   private async generateUniqueReferenceNo(): Promise<string> {

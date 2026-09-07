@@ -1,22 +1,25 @@
 import React, { useState } from 'react';
-import { 
-  ArrowLeft, 
-  UserCheck, 
-  Clock, 
-  CheckCircle2, 
-  XCircle, 
-  MessageSquare, 
-  History, 
-  ShieldCheck, 
-  Mail, 
-  Phone, 
-  MapPin, 
-  FileText, 
-  Calculator, 
+import {
+  ArrowLeft,
+  UserCheck,
+  Clock,
+  CheckCircle2,
+  XCircle,
+  MessageSquare,
+  History,
+  ShieldCheck,
+  Mail,
+  Phone,
+  MapPin,
+  FileText,
+  Calculator,
   AlertTriangle,
   Send,
   User,
-  ExternalLink
+  ExternalLink,
+  Edit3,
+  ArrowRightCircle,
+  Ban
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { AdminLayout } from '../../components/admin/AdminLayout';
@@ -24,19 +27,23 @@ import { StatusChip } from '../../components/common/StatusChip';
 import { Button } from '../../components/common/Button';
 import { Modal } from '../../components/common/Modal';
 import { formatIDR } from '../../data/mockData';
-import { ApplicationStatus } from '../../types';
+import { ApplicationStatus, PaymentFrequency } from '../../types';
 
 interface ApplicationDetailViewProps {
   id?: string;
 }
 
 export const ApplicationDetailView: React.FC<ApplicationDetailViewProps> = ({ id }) => {
-  const { 
-    applications, 
-    staffList, 
-    updateApplicationStatus, 
-    assignApplication, 
-    addApplicationNote, 
+  const {
+    applications,
+    staffList,
+    products,
+    updateApplicationStatus,
+    assignApplication,
+    addApplicationNote,
+    updateLead,
+    convertLead,
+    declineLead,
     navigate,
     auditLogs
   } = useApp();
@@ -52,6 +59,30 @@ export const ApplicationDetailView: React.FC<ApplicationDetailViewProps> = ({ id
 
   // Assignment select state
   const [selectedStaff, setSelectedStaff] = useState(application?.assignedTo || '');
+
+  // Edit Lead modal state (DRAFT leads only)
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isSavingLead, setIsSavingLead] = useState(false);
+  const [isConverting, setIsConverting] = useState(false);
+  const [editForm, setEditForm] = useState({
+    productId: '',
+    fullName: '',
+    email: '',
+    phone: '',
+    age: 0,
+    city: '',
+    notes: '',
+    updateSimulation: false,
+    simAge: 0,
+    simSumAssured: 0,
+    simPaymentTerm: 5,
+    simFrequency: 'Bulanan' as PaymentFrequency,
+  });
+
+  // Decline Lead modal state (DRAFT leads only)
+  const [isDeclineModalOpen, setIsDeclineModalOpen] = useState(false);
+  const [declineReason, setDeclineReason] = useState('');
+  const [isDeclining, setIsDeclining] = useState(false);
 
   if (!application) {
     return (
@@ -88,6 +119,71 @@ export const ApplicationDetailView: React.FC<ApplicationDetailViewProps> = ({ id
     addApplicationNote(application.id, noteContent.trim());
     setNoteContent('');
   };
+
+  const handleOpenEdit = () => {
+    setEditForm({
+      productId: application.productSnapshot.id,
+      fullName: application.applicant.fullName,
+      email: application.applicant.email,
+      phone: application.applicant.phone,
+      age: application.applicant.age,
+      city: application.applicant.city,
+      notes: application.applicant.notes ?? '',
+      updateSimulation: false,
+      simAge: application.applicant.age || application.simulation.params.age || 0,
+      simSumAssured: application.simulation.params.sumAssured,
+      simPaymentTerm: application.simulation.params.paymentTerm || 5,
+      simFrequency: application.simulation.params.frequency,
+    });
+    setIsEditModalOpen(true);
+  };
+
+  const handleSaveEdit = () => {
+    setIsSavingLead(true);
+    updateLead(application.id, {
+      productId: editForm.productId !== application.productSnapshot.id ? editForm.productId : undefined,
+      applicant: {
+        fullName: editForm.fullName,
+        email: editForm.email,
+        phone: editForm.phone,
+        age: editForm.age,
+        city: editForm.city,
+        notes: editForm.notes,
+      },
+      ...(editForm.updateSimulation && {
+        simulation: {
+          age: editForm.simAge,
+          sumAssured: editForm.simSumAssured,
+          paymentTerm: editForm.simPaymentTerm,
+          frequency: editForm.simFrequency,
+        },
+      }),
+    })
+      .then(() => setIsEditModalOpen(false))
+      .catch(() => {})
+      .finally(() => setIsSavingLead(false));
+  };
+
+  const handleConvert = () => {
+    setIsConverting(true);
+    convertLead(application.id)
+      .catch(() => {})
+      .finally(() => setIsConverting(false));
+  };
+
+  const handleConfirmDecline = () => {
+    if (!declineReason.trim()) return;
+    setIsDeclining(true);
+    declineLead(application.id, declineReason.trim())
+      .then(() => {
+        setIsDeclineModalOpen(false);
+        setDeclineReason('');
+      })
+      .catch(() => {})
+      .finally(() => setIsDeclining(false));
+  };
+
+  const selectedProductForEdit = products.find((p) => p.id === editForm.productId);
 
   // Filter audit logs for this application
   const appAuditLogs = auditLogs.filter(
@@ -136,52 +232,96 @@ export const ApplicationDetailView: React.FC<ApplicationDetailViewProps> = ({ id
 
           {/* Workflow Status Action Buttons (EXPLICIT PROMPT REQUIREMENT) */}
           <div className="flex flex-wrap items-center gap-2.5">
-            {application.status === 'Submitted' && (
-              <Button
-                id="action-start-review"
-                variant="secondary"
-                size="sm"
-                icon={<Clock className="w-3.5 h-3.5 text-amber-600" />}
-                onClick={() => handleStatusChange('Under Review')}
-              >
-                Mulai Peninjauan (Under Review)
-              </Button>
-            )}
+            {application.status === 'Draft' ? (
+              <>
+                <Button
+                  id="action-edit-lead"
+                  variant="secondary"
+                  size="sm"
+                  icon={<Edit3 className="w-3.5 h-3.5 text-[#0F4C5C]" />}
+                  onClick={handleOpenEdit}
+                >
+                  Edit Prospek...
+                </Button>
+                <Button
+                  id="action-convert-lead"
+                  variant="primary"
+                  size="sm"
+                  className="bg-[#0F4C5C] hover:bg-[#0A333E] rounded-xl"
+                  icon={<ArrowRightCircle className="w-3.5 h-3.5" />}
+                  disabled={!application.hasSimulation || isConverting}
+                  onClick={handleConvert}
+                >
+                  {isConverting ? 'Memproses...' : 'Konversi ke Aplikasi'}
+                </Button>
+                <Button
+                  id="action-decline-lead"
+                  variant="danger"
+                  size="sm"
+                  className="rounded-xl"
+                  icon={<Ban className="w-3.5 h-3.5" />}
+                  onClick={() => setIsDeclineModalOpen(true)}
+                >
+                  Prospek Tidak Berlanjut...
+                </Button>
+              </>
+            ) : (
+              <>
+                {application.status === 'Submitted' && (
+                  <Button
+                    id="action-start-review"
+                    variant="secondary"
+                    size="sm"
+                    icon={<Clock className="w-3.5 h-3.5 text-amber-600" />}
+                    onClick={() => handleStatusChange('Under Review')}
+                  >
+                    Mulai Peninjauan (Under Review)
+                  </Button>
+                )}
 
-            {application.status !== 'Approved' && (
-              <Button
-                id="action-approve"
-                variant="primary"
-                size="sm"
-                className="bg-[#0F4C5C] hover:bg-[#0A333E] rounded-xl"
-                icon={<CheckCircle2 className="w-3.5 h-3.5" />}
-                onClick={() => handleStatusChange('Approved')}
-              >
-                Setujui Aplikasi (Approve)
-              </Button>
-            )}
+                {application.status !== 'Approved' && (
+                  <Button
+                    id="action-approve"
+                    variant="primary"
+                    size="sm"
+                    className="bg-[#0F4C5C] hover:bg-[#0A333E] rounded-xl"
+                    icon={<CheckCircle2 className="w-3.5 h-3.5" />}
+                    onClick={() => handleStatusChange('Approved')}
+                  >
+                    Setujui Aplikasi (Approve)
+                  </Button>
+                )}
 
-            {application.status !== 'Rejected' && (
-              <Button
-                id="action-reject"
-                variant="danger"
-                size="sm"
-                className="rounded-xl"
-                icon={<XCircle className="w-3.5 h-3.5" />}
-                onClick={() => setIsRejectModalOpen(true)}
-              >
-                Tolak Aplikasi...
-              </Button>
+                {application.status !== 'Rejected' && (
+                  <Button
+                    id="action-reject"
+                    variant="danger"
+                    size="sm"
+                    className="rounded-xl"
+                    icon={<XCircle className="w-3.5 h-3.5" />}
+                    onClick={() => setIsRejectModalOpen(true)}
+                  >
+                    Tolak Aplikasi...
+                  </Button>
+                )}
+              </>
             )}
           </div>
         </div>
+
+        {application.status === 'Draft' && !application.hasSimulation && (
+          <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-start gap-2.5">
+            <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+            <span>Konversi ke aplikasi formal membutuhkan simulasi premi. Klik "Edit Prospek" untuk menjalankannya.</span>
+          </div>
+        )}
 
         {/* Rejection Reason Notice (If rejected) */}
         {application.status === 'Rejected' && application.rejectionReason && (
           <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-950 text-xs flex items-start gap-3">
             <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
             <div className="space-y-1">
-              <strong className="font-bold">Aplikasi Ditolak Oleh Underwriting:</strong>
+              <strong className="font-bold">Ditolak / Ditutup:</strong>
               <p className="leading-relaxed">{application.rejectionReason}</p>
             </div>
           </div>
@@ -269,47 +409,59 @@ export const ApplicationDetailView: React.FC<ApplicationDetailViewProps> = ({ id
                 </span>
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5 text-xs">
-                <div className="bg-[#F8FAFB] p-3.5 rounded-2xl border border-gray-100">
-                  <div className="text-gray-400 text-[11px]">Nama Produk:</div>
-                  <div className="font-bold text-[#111827] mt-0.5 truncate">{application.productSnapshot.name}</div>
-                </div>
+              {application.hasSimulation ? (
+                <>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5 text-xs">
+                    <div className="bg-[#F8FAFB] p-3.5 rounded-2xl border border-gray-100">
+                      <div className="text-gray-400 text-[11px]">Nama Produk:</div>
+                      <div className="font-bold text-[#111827] mt-0.5 truncate">{application.productSnapshot.name}</div>
+                    </div>
 
-                <div className="bg-[#F8FAFB] p-3.5 rounded-2xl border border-gray-100">
-                  <div className="text-gray-400 text-[11px]">Uang Pertanggungan:</div>
-                  <div className="font-extrabold text-[#0F4C5C] mt-0.5">
-                    {formatIDR(application.simulation.params.sumAssured)}
-                  </div>
-                </div>
+                    <div className="bg-[#F8FAFB] p-3.5 rounded-2xl border border-gray-100">
+                      <div className="text-gray-400 text-[11px]">Uang Pertanggungan:</div>
+                      <div className="font-extrabold text-[#0F4C5C] mt-0.5">
+                        {formatIDR(application.simulation.params.sumAssured)}
+                      </div>
+                    </div>
 
-                <div className="bg-[#F8FAFB] p-3.5 rounded-2xl border border-gray-100">
-                  <div className="text-gray-400 text-[11px]">Masa Pembayaran:</div>
-                  <div className="font-bold text-[#111827] mt-0.5">
-                    {application.simulation.params.paymentTerm} Tahun
-                  </div>
-                </div>
+                    <div className="bg-[#F8FAFB] p-3.5 rounded-2xl border border-gray-100">
+                      <div className="text-gray-400 text-[11px]">Masa Pembayaran:</div>
+                      <div className="font-bold text-[#111827] mt-0.5">
+                        {application.simulation.params.paymentTerm} Tahun
+                      </div>
+                    </div>
 
-                <div className="bg-[#F8FAFB] p-3.5 rounded-2xl border border-gray-100">
-                  <div className="text-gray-400 text-[11px]">Frekuensi Bayar:</div>
-                  <div className="font-bold text-[#111827] mt-0.5">
-                    {application.simulation.params.frequency}
+                    <div className="bg-[#F8FAFB] p-3.5 rounded-2xl border border-gray-100">
+                      <div className="text-gray-400 text-[11px]">Frekuensi Bayar:</div>
+                      <div className="font-bold text-[#111827] mt-0.5">
+                        {application.simulation.params.frequency}
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
 
-              {/* Premium Breakdown */}
-              <div className="p-5 rounded-[24px] bg-[#0A2B33] text-white flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-soft">
-                <div>
-                  <div className="text-xs text-slate-300">Ilustrasi Premi Bulanan:</div>
-                  <div className="text-xl font-extrabold font-mono text-white mt-0.5">
-                    {formatIDR(application.simulation.monthlyPremium)} / bulan
+                  {/* Premium Breakdown */}
+                  <div className="p-5 rounded-[24px] bg-[#0A2B33] text-white flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-soft">
+                    <div>
+                      <div className="text-xs text-slate-300">Ilustrasi Premi Bulanan:</div>
+                      <div className="text-xl font-extrabold font-mono text-white mt-0.5">
+                        {formatIDR(application.simulation.monthlyPremium)} / bulan
+                      </div>
+                    </div>
+                    <div className="text-xs text-slate-300 sm:text-right space-y-1">
+                      <div>Tahunan: <strong className="text-white">{formatIDR(application.simulation.annualPremium)} / thn</strong></div>
+                      <div>Total Akumulasi: <strong className="text-white">{formatIDR(application.simulation.totalEstimatedInvestment)}</strong></div>
+                    </div>
                   </div>
+                </>
+              ) : (
+                <div className="p-5 rounded-2xl bg-[#F8FAFB] border border-dashed border-gray-200 text-xs text-gray-500 flex items-start gap-2.5">
+                  <Calculator className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" />
+                  <span>
+                    Belum ada simulasi premi untuk prospek ini. Produk yang diminati: <strong className="text-[#111827]">{application.productSnapshot.name}</strong>.
+                    {application.status === 'Draft' && ' Jalankan simulasi melalui tombol "Edit Prospek" untuk melengkapinya.'}
+                  </span>
                 </div>
-                <div className="text-xs text-slate-300 sm:text-right space-y-1">
-                  <div>Tahunan: <strong className="text-white">{formatIDR(application.simulation.annualPremium)} / thn</strong></div>
-                  <div>Total Akumulasi: <strong className="text-white">{formatIDR(application.simulation.totalEstimatedInvestment)}</strong></div>
-                </div>
-              </div>
+              )}
             </div>
 
             {/* Audit Trail for this Application */}
@@ -439,6 +591,219 @@ export const ApplicationDetailView: React.FC<ApplicationDetailViewProps> = ({ id
                 onClick={handleConfirmReject}
               >
                 Konfirmasi Tolak Aplikasi
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* EDIT LEAD MODAL (DRAFT leads only) */}
+      {isEditModalOpen && (
+        <Modal
+          isOpen={true}
+          onClose={() => setIsEditModalOpen(false)}
+          title="Edit Data Prospek"
+          maxWidth="lg"
+        >
+          <div className="space-y-4 text-xs text-slate-700">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1.5 sm:col-span-2">
+                <label className="block font-semibold text-slate-800">Produk Diminati</label>
+                <select
+                  value={editForm.productId}
+                  onChange={(e) => setEditForm((f) => ({ ...f, productId: e.target.value }))}
+                  className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F4C5C] focus:bg-white text-slate-900"
+                >
+                  {products.filter((p) => p.status === 'Published').map((p) => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block font-semibold text-slate-800">Nama Lengkap</label>
+                <input
+                  type="text"
+                  value={editForm.fullName}
+                  onChange={(e) => setEditForm((f) => ({ ...f, fullName: e.target.value }))}
+                  className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F4C5C] focus:bg-white text-slate-900"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="block font-semibold text-slate-800">Usia</label>
+                <input
+                  type="number"
+                  min={0}
+                  value={editForm.age || ''}
+                  onChange={(e) => setEditForm((f) => ({ ...f, age: Number(e.target.value) || 0 }))}
+                  className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F4C5C] focus:bg-white text-slate-900"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block font-semibold text-slate-800">Email</label>
+                <input
+                  type="email"
+                  value={editForm.email}
+                  onChange={(e) => setEditForm((f) => ({ ...f, email: e.target.value }))}
+                  className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F4C5C] focus:bg-white text-slate-900"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="block font-semibold text-slate-800">Telepon / WhatsApp</label>
+                <input
+                  type="text"
+                  value={editForm.phone}
+                  onChange={(e) => setEditForm((f) => ({ ...f, phone: e.target.value }))}
+                  className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F4C5C] focus:bg-white text-slate-900"
+                />
+              </div>
+
+              <div className="space-y-1.5 sm:col-span-2">
+                <label className="block font-semibold text-slate-800">Kota Domisili</label>
+                <input
+                  type="text"
+                  value={editForm.city}
+                  onChange={(e) => setEditForm((f) => ({ ...f, city: e.target.value }))}
+                  className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F4C5C] focus:bg-white text-slate-900"
+                />
+              </div>
+
+              <div className="space-y-1.5 sm:col-span-2">
+                <label className="block font-semibold text-slate-800">Catatan Hasil Kontak</label>
+                <textarea
+                  rows={2}
+                  value={editForm.notes}
+                  onChange={(e) => setEditForm((f) => ({ ...f, notes: e.target.value }))}
+                  className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F4C5C] focus:bg-white text-slate-900 resize-none"
+                />
+              </div>
+            </div>
+
+            <div className="pt-3 border-t border-slate-100 space-y-3">
+              <label className="flex items-center gap-2 font-semibold text-slate-800 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={editForm.updateSimulation}
+                  onChange={(e) => setEditForm((f) => ({ ...f, updateSimulation: e.target.checked }))}
+                  className="rounded"
+                />
+                {application.hasSimulation ? 'Perbarui simulasi premi dengan angka baru' : 'Jalankan simulasi premi untuk prospek ini'}
+              </label>
+
+              {editForm.updateSimulation && (
+                <div className="grid grid-cols-2 gap-3 pl-6">
+                  <div className="space-y-1.5">
+                    <label className="block text-slate-600">Usia (untuk simulasi)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={editForm.simAge || ''}
+                      onChange={(e) => setEditForm((f) => ({ ...f, simAge: Number(e.target.value) || 0 }))}
+                      className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F4C5C] focus:bg-white text-slate-900"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="block text-slate-600">Uang Pertanggungan (Rp)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={editForm.simSumAssured || ''}
+                      onChange={(e) => setEditForm((f) => ({ ...f, simSumAssured: Number(e.target.value) || 0 }))}
+                      className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F4C5C] focus:bg-white text-slate-900"
+                    />
+                    {selectedProductForEdit && (
+                      <p className="text-[10px] text-slate-400">
+                        Rentang: {formatIDR(selectedProductForEdit.minSumAssured)} - {formatIDR(selectedProductForEdit.maxSumAssured)}
+                      </p>
+                    )}
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="block text-slate-600">Masa Pembayaran</label>
+                    <select
+                      value={editForm.simPaymentTerm}
+                      onChange={(e) => setEditForm((f) => ({ ...f, simPaymentTerm: Number(e.target.value) }))}
+                      className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F4C5C] focus:bg-white text-slate-900"
+                    >
+                      {(selectedProductForEdit?.allowedPaymentTerms ?? [5, 10, 15, 20]).map((term) => (
+                        <option key={term} value={term}>{term} Tahun</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="block text-slate-600">Frekuensi Bayar</label>
+                    <select
+                      value={editForm.simFrequency}
+                      onChange={(e) => setEditForm((f) => ({ ...f, simFrequency: e.target.value as PaymentFrequency }))}
+                      className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F4C5C] focus:bg-white text-slate-900"
+                    >
+                      <option value="Bulanan">Bulanan</option>
+                      <option value="Triwulanan">Triwulanan</option>
+                      <option value="Semesteran">Semesteran</option>
+                      <option value="Tahunan">Tahunan</option>
+                    </select>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="pt-2 flex justify-end gap-2">
+              <Button variant="secondary" size="sm" onClick={() => setIsEditModalOpen(false)}>
+                Batal
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                className="bg-[#0F4C5C]"
+                disabled={isSavingLead || !editForm.fullName.trim() || (!editForm.email.trim() && !editForm.phone.trim())}
+                onClick={handleSaveEdit}
+              >
+                {isSavingLead ? 'Menyimpan...' : 'Simpan Perubahan'}
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* DECLINE LEAD MODAL (DRAFT leads only) */}
+      {isDeclineModalOpen && (
+        <Modal
+          isOpen={true}
+          onClose={() => setIsDeclineModalOpen(false)}
+          title="Tandai Prospek Tidak Berlanjut"
+        >
+          <div className="space-y-4 text-xs text-slate-700">
+            <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-900 flex items-start gap-2.5">
+              <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+              <p>Prospek ini belum pernah menjadi aplikasi formal - menandainya di sini hanya menutup catatan lead, bukan menolak sebuah pengajuan asuransi.</p>
+            </div>
+
+            <div className="space-y-1.5">
+              <label htmlFor="decline-reason" className="block font-semibold text-slate-800">
+                Alasan (Wajib Diisi):
+              </label>
+              <textarea
+                id="decline-reason"
+                rows={3}
+                required
+                value={declineReason}
+                onChange={(e) => setDeclineReason(e.target.value)}
+                placeholder="Contoh: Prospek tidak dapat dihubungi, tidak lagi berminat, salah target..."
+                className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-500 focus:bg-white text-slate-900 resize-none"
+              />
+            </div>
+
+            <div className="pt-2 flex justify-end gap-2">
+              <Button variant="secondary" size="sm" onClick={() => setIsDeclineModalOpen(false)}>
+                Batal
+              </Button>
+              <Button
+                variant="danger"
+                size="sm"
+                disabled={!declineReason.trim() || isDeclining}
+                onClick={handleConfirmDecline}
+              >
+                {isDeclining ? 'Memproses...' : 'Konfirmasi Tutup Prospek'}
               </Button>
             </div>
           </div>

@@ -318,6 +318,46 @@ export const adminApplicationsApi = {
       `/admin/applications/${id}/notes`,
       { method: 'POST', body: JSON.stringify({ content }) },
     ),
+  // Only ever valid while status is DRAFT (a lead captured by the chatbot,
+  // see Automation/) - staff correcting/completing a lead's details after
+  // calling the prospect. Every field optional - send only what changed.
+  updateLead: (
+    id: string,
+    input: {
+      productId?: string;
+      applicant?: {
+        fullName?: string;
+        email?: string;
+        phone?: string;
+        age?: number;
+        city?: string;
+        preferredContactTime?: BackendContactTime;
+        notes?: string;
+      };
+      simulation?: {
+        age: number;
+        sumAssured: number;
+        paymentTermYears: number;
+        paymentFrequency: BackendPaymentFrequency;
+      };
+    },
+  ) =>
+    request<BackendApplicationDetail>(`/admin/applications/${id}/lead`, {
+      method: 'PATCH',
+      body: JSON.stringify(input),
+    }),
+  // DRAFT -> SUBMITTED, once staff have confirmed the lead by phone. Requires
+  // a simulation already attached (from the chatbot or from updateLead()).
+  convertLead: (id: string) =>
+    request<BackendApplicationDetail>(`/admin/applications/${id}/convert`, { method: 'POST' }),
+  // DRAFT -> REJECTED for a lead that never became a real application
+  // (prospect not interested / unreachable) - separate from reject() above,
+  // which only applies to a formally SUBMITTED/UNDER_REVIEW application.
+  declineLead: (id: string, reason: string) =>
+    request<BackendApplicationDetail>(`/admin/applications/${id}/decline-lead`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    }),
 };
 
 export const adminDashboardApi = {

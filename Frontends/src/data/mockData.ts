@@ -678,6 +678,7 @@ export const INITIAL_APPLICATIONS: ApplicationRecord[] = [
       totalEstimatedInvestment: 238_900_000,
       isValid: true
     },
+    hasSimulation: true,
     status: 'Under Review',
     assignedTo: 'Bobby Pratama',
     internalNotes: [
@@ -750,6 +751,7 @@ export const INITIAL_APPLICATIONS: ApplicationRecord[] = [
       totalEstimatedInvestment: 213_300_000,
       isValid: true
     },
+    hasSimulation: true,
     status: 'Submitted',
     assignedTo: undefined,
     internalNotes: [],
@@ -800,6 +802,7 @@ export const INITIAL_APPLICATIONS: ApplicationRecord[] = [
       totalEstimatedInvestment: 578_000_000,
       isValid: true
     },
+    hasSimulation: true,
     status: 'Approved',
     assignedTo: 'Sarah Wijaya',
     internalNotes: [
@@ -871,6 +874,7 @@ export const INITIAL_APPLICATIONS: ApplicationRecord[] = [
       totalEstimatedInvestment: 98_800_000,
       isValid: true
     },
+    hasSimulation: true,
     status: 'Under Review',
     assignedTo: 'Dewi Anggraeni',
     internalNotes: [
@@ -936,6 +940,7 @@ export const INITIAL_APPLICATIONS: ApplicationRecord[] = [
       totalEstimatedInvestment: 491_250_000,
       isValid: false
     },
+    hasSimulation: true,
     status: 'Rejected',
     assignedTo: 'Sarah Wijaya',
     rejectionReason: 'Batas Usia Tertanggung Melebihi Ketentuan Produk: Usia masuk pemohon (63 tahun) ditambah masa bayar 15 tahun melebihi batas maturitas polis maksimal 75 tahun.',
@@ -1002,6 +1007,7 @@ export const INITIAL_APPLICATIONS: ApplicationRecord[] = [
       totalEstimatedInvestment: 308_250_000,
       isValid: true
     },
+    hasSimulation: true,
     status: 'Approved',
     assignedTo: 'Bobby Pratama',
     internalNotes: [

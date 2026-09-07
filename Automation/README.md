@@ -111,4 +111,4 @@ Getting a working AI Agent + tools workflow out of this specific n8n build (`2.3
 
 ## Known limitation
 
-Draft leads created here don't yet show up distinctly in the admin `ApplicationsInboxView` (its status filter only lists Submitted/Under Review/Approved/Rejected) — staff can query them directly in the database for now. A proper "Leads" admin view is natural follow-up work, not required for this to function.
+Draft leads created here don't have a dedicated filter in the admin `ApplicationsInboxView` (its status dropdown only lists Submitted/Under Review/Approved/Rejected, so a `DRAFT` lead shows up mixed in with everything under "Semua Status"). Once opened, though, staff have full capability on a lead — edit its details, run/re-run a simulation, convert it into a formal application, or decline it — see the admin lead-management endpoints in `../Docs/API-LIST-V0.md` (`PATCH .../lead`, `POST .../convert`, `POST .../decline-lead`). A proper dedicated "Draft" filter option is natural, low-effort follow-up work, not required for this to function.
