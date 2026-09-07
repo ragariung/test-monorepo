@@ -7,7 +7,8 @@ import {
   SimulationRuleVersion,
   SimulationResult,
   ApplicationStatus,
-  ApplicantData
+  ApplicantData,
+  PaymentFrequency
 } from '../types';
 import {
   INITIAL_SIMULATION_RULES
@@ -20,6 +21,7 @@ import {
   adaptProduct,
   adaptUser,
   CONTACT_TIME_TO_BACKEND,
+  FREQUENCY_TO_BACKEND,
 } from '../lib/adapters';
 
 export interface ToastMessage {
@@ -56,6 +58,16 @@ interface AppContextType {
   updateApplicationStatus: (appId: string, status: ApplicationStatus, reason?: string) => void;
   assignApplication: (appId: string, staffName: string | null) => void;
   addApplicationNote: (appId: string, noteText: string) => void;
+  updateLead: (
+    appId: string,
+    input: {
+      productId?: string;
+      applicant?: Partial<ApplicantData>;
+      simulation?: { age: number; sumAssured: number; paymentTerm: number; frequency: PaymentFrequency };
+    },
+  ) => Promise<void>;
+  convertLead: (appId: string) => Promise<void>;
+  declineLead: (appId: string, reason: string) => Promise<void>;
   updateProduct: (productIdOrUpdated: string | Product, partial?: Partial<Product>) => void;
   toasts: ToastMessage[];
   showToast: (title: string, message: string, type?: 'success' | 'info' | 'warning' | 'error') => void;
@@ -342,6 +354,77 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   // ---------------------------------------------------------------------
+  // Admin: managing a DRAFT lead (edit / convert to application / decline)
+  // ---------------------------------------------------------------------
+
+  const updateLead: AppContextType['updateLead'] = (appId, input) => {
+    const payload: Parameters<typeof adminApplicationsApi.updateLead>[1] = {};
+    if (input.productId) payload.productId = input.productId;
+    if (input.applicant) {
+      const a = input.applicant;
+      payload.applicant = {
+        ...(a.fullName !== undefined && { fullName: a.fullName }),
+        ...(a.email !== undefined && { email: a.email }),
+        ...(a.phone !== undefined && { phone: a.phone }),
+        ...(a.age !== undefined && { age: a.age }),
+        ...(a.city !== undefined && { city: a.city }),
+        ...(a.preferredContactTime !== undefined && {
+          preferredContactTime: CONTACT_TIME_TO_BACKEND[a.preferredContactTime],
+        }),
+        ...(a.notes !== undefined && { notes: a.notes }),
+      };
+    }
+    if (input.simulation) {
+      payload.simulation = {
+        age: input.simulation.age,
+        sumAssured: input.simulation.sumAssured,
+        paymentTermYears: input.simulation.paymentTerm,
+        paymentFrequency: FREQUENCY_TO_BACKEND[input.simulation.frequency],
+      };
+    }
+
+    return adminApplicationsApi
+      .updateLead(appId, payload)
+      .then((detail) => {
+        upsertApplication(adaptApplicationDetail(detail));
+        showToast('Prospek Diperbarui', 'Data prospek berhasil disimpan.', 'success');
+      })
+      .catch((err: unknown) => {
+        const message = err instanceof ApiError ? err.message : 'Gagal memperbarui data prospek.';
+        showToast('Gagal Memperbarui Prospek', message, 'error');
+        throw err;
+      });
+  };
+
+  const convertLead: AppContextType['convertLead'] = (appId) => {
+    return adminApplicationsApi
+      .convertLead(appId)
+      .then((detail) => {
+        upsertApplication(adaptApplicationDetail(detail));
+        showToast('Prospek Dikonversi', 'Prospek berhasil diajukan sebagai aplikasi formal.', 'success');
+      })
+      .catch((err: unknown) => {
+        const message = err instanceof ApiError ? err.message : 'Gagal mengonversi prospek.';
+        showToast('Gagal Mengonversi', message, 'error');
+        throw err;
+      });
+  };
+
+  const declineLead: AppContextType['declineLead'] = (appId, reason) => {
+    return adminApplicationsApi
+      .declineLead(appId, reason)
+      .then((detail) => {
+        upsertApplication(adaptApplicationDetail(detail));
+        showToast('Prospek Ditutup', 'Prospek ditandai tidak berlanjut.', 'info');
+      })
+      .catch((err: unknown) => {
+        const message = err instanceof ApiError ? err.message : 'Gagal menutup prospek.';
+        showToast('Gagal Menutup Prospek', message, 'error');
+        throw err;
+      });
+  };
+
+  // ---------------------------------------------------------------------
   // Product CMS - still mock/local (Phase 2 wiring item): ProductCmsView's
   // edits are not yet persisted to PATCH /admin/products/:id.
   // ---------------------------------------------------------------------
@@ -389,6 +472,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         updateApplicationStatus,
         assignApplication,
         addApplicationNote,
+        updateLead,
+        convertLead,
+        declineLead,
         updateProduct,
         toasts,
         showToast,

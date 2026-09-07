@@ -17,6 +17,7 @@ export const ROLE_PERMISSIONS: Record<StaffRole, string[]> = {
     'applications:reject',
     'applications:assign',
     'applications:note',
+    'applications:manage_lead',
     'products:read',
     'products:write',
     'products:publish',
@@ -33,10 +34,17 @@ export const ROLE_PERMISSIONS: Record<StaffRole, string[]> = {
     'applications:reject',
     'applications:assign',
     'applications:note',
+    'applications:manage_lead',
     'audit:read',
   ],
-  UNDERWRITER: ['applications:read', 'applications:review', 'applications:note', 'audit:read'],
-  TELE_CONSULTANT: ['applications:read', 'applications:note'],
+  UNDERWRITER: [
+    'applications:read',
+    'applications:review',
+    'applications:note',
+    'applications:manage_lead',
+    'audit:read',
+  ],
+  TELE_CONSULTANT: ['applications:read', 'applications:note', 'applications:manage_lead'],
   // PRD.md §5's "Read-only / Auditor" role: view applications, products, and
   // audit history; no mutation permission of any kind, by design.
   AUDITOR: ['applications:read', 'products:read', 'simulation_rules:read', 'audit:read'],
