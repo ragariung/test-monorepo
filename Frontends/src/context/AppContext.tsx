@@ -20,8 +20,10 @@ import {
   adaptInboxRow,
   adaptProduct,
   adaptUser,
+  ALCOHOL_USE_TO_BACKEND,
   CONTACT_TIME_TO_BACKEND,
   FREQUENCY_TO_BACKEND,
+  SMOKING_STATUS_TO_BACKEND,
 } from '../lib/adapters';
 
 export interface ToastMessage {
@@ -36,6 +38,11 @@ interface AppContextType {
   navigate: (path: string) => void;
   products: Product[];
   applications: ApplicationRecord[];
+  /** Set when the most recent /admin/applications/:id detail fetch failed
+   * (403 - not assigned to you, or 404 - doesn't exist); cleared on every
+   * new navigation. ApplicationDetailView reads this instead of silently
+   * falling back to a different application. */
+  applicationDetailError: { id: string; status: number } | null;
   staffList: StaffUser[];
   simulationRules: SimulationRuleVersion[];
   auditLogs: AuditLogEntry[];
@@ -97,6 +104,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const [products, setProducts] = useState<Product[]>([]);
   const [applications, setApplications] = useState<ApplicationRecord[]>([]);
+  const [applicationDetailError, setApplicationDetailError] = useState<{ id: string; status: number } | null>(null);
   const [staffList, setStaffList] = useState<StaffUser[]>([]);
   const [simulationRules] = useState<SimulationRuleVersion[]>(INITIAL_SIMULATION_RULES);
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
@@ -224,11 +232,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const match = currentPath.match(/^\/admin\/applications\/([^/]+)$/);
     if (!match || !isAdminLoggedIn) return;
     const id = match[1];
+    setApplicationDetailError(null);
     adminApplicationsApi
       .detail(id)
       .then((detail) => upsertApplication(adaptApplicationDetail(detail)))
-      .catch(() => {
-        // Leave whatever's already in state (e.g. the inbox row) as-is.
+      .catch((err: unknown) => {
+        // A 403 (not assigned to you - see Backends/'s applications:read
+        // scoping) or 404 means this id genuinely isn't visible/available to
+        // this user. ApplicationDetailView checks this instead of silently
+        // rendering whatever else happens to be in local state.
+        setApplicationDetailError({ id, status: err instanceof ApiError ? err.status : 0 });
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPath, isAdminLoggedIn]);
@@ -377,6 +390,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         ...(a.email !== undefined && { email: a.email }),
         ...(a.phone !== undefined && { phone: a.phone }),
         ...(a.age !== undefined && { age: a.age }),
+        ...(a.dob !== undefined && { dob: a.dob }),
+        ...(a.heightCm !== undefined && { heightCm: a.heightCm }),
+        ...(a.weightKg !== undefined && { weightKg: a.weightKg }),
+        ...(a.smokingStatus !== undefined && { smokingStatus: SMOKING_STATUS_TO_BACKEND[a.smokingStatus] }),
+        ...(a.alcoholUse !== undefined && { alcoholUse: ALCOHOL_USE_TO_BACKEND[a.alcoholUse] }),
+        ...(a.medicalHistory !== undefined && { medicalHistory: a.medicalHistory }),
         ...(a.city !== undefined && { city: a.city }),
         ...(a.preferredContactTime !== undefined && {
           preferredContactTime: CONTACT_TIME_TO_BACKEND[a.preferredContactTime],
@@ -504,6 +523,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         navigate,
         products,
         applications,
+        applicationDetailError,
         staffList,
         simulationRules,
         auditLogs,

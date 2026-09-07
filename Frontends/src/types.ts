@@ -89,6 +89,19 @@ export interface ApplicantData {
   email: string;
   phone: string;
   age: number;
+  // ISO date string ("1990-05-15"). Typically filled in by staff during
+  // contact (see ApplicationDetailView's Edit Lead form), not collected on
+  // the public application form - additional identity data, not a
+  // replacement for age (which still drives simulation/eligibility).
+  dob?: string;
+  // Health/medical intake - same story as dob: filled in by staff during
+  // contact via the Edit Lead form, not collected on the public form.
+  heightCm?: number;
+  weightKg?: number;
+  smokingStatus?: 'Tidak Pernah' | 'Mantan Perokok' | 'Perokok Aktif';
+  alcoholUse?: 'Tidak Pernah' | 'Sesekali' | 'Rutin';
+  /** Free text: specific medical conditions, surgeries, or hospitalizations. */
+  medicalHistory?: string;
   city: string;
   preferredContactTime: 'Pagi (09.00 - 12.00 WIB)' | 'Siang (13.00 - 17.00 WIB)' | 'Malam (19.00 - 21.00 WIB)';
   notes?: string;

@@ -5,6 +5,7 @@
  * the full list of naming/enum differences this bridges.
  */
 import {
+  BackendAlcoholUse,
   BackendApplicationDetail,
   BackendApplicationStatus,
   BackendAuditLogRow,
@@ -15,6 +16,7 @@ import {
   BackendProductCategory,
   BackendProductDocument,
   BackendSimulationResult,
+  BackendSmokingStatus,
   BackendStaffRole,
 } from './api';
 import {
@@ -160,6 +162,18 @@ const CONTACT_TIME_LABELS: Record<BackendApplicationDetail['preferredContactTime
   EVENING: 'Malam (19.00 - 21.00 WIB)',
 };
 
+const SMOKING_STATUS_LABELS: Record<BackendSmokingStatus, NonNullable<ApplicantData['smokingStatus']>> = {
+  NEVER: 'Tidak Pernah',
+  FORMER: 'Mantan Perokok',
+  CURRENT: 'Perokok Aktif',
+};
+
+const ALCOHOL_USE_LABELS: Record<BackendAlcoholUse, NonNullable<ApplicantData['alcoholUse']>> = {
+  NEVER: 'Tidak Pernah',
+  OCCASIONAL: 'Sesekali',
+  REGULAR: 'Rutin',
+};
+
 function formatWIB(iso: string): string {
   const d = new Date(iso);
   const datePart = new Intl.DateTimeFormat('id-ID', {
@@ -253,6 +267,12 @@ export function adaptApplicationDetail(app: BackendApplicationDetail): Applicati
       email: app.applicantEmail ?? '',
       phone: app.applicantPhone ?? '',
       age: app.applicantAge ?? 0,
+      dob: app.applicantDob?.slice(0, 10),
+      heightCm: app.applicantHeightCm ?? undefined,
+      weightKg: app.applicantWeightKg ?? undefined,
+      smokingStatus: app.smokingStatus ? SMOKING_STATUS_LABELS[app.smokingStatus] : undefined,
+      alcoholUse: app.alcoholUse ? ALCOHOL_USE_LABELS[app.alcoholUse] : undefined,
+      medicalHistory: app.medicalHistory ?? undefined,
       city: app.applicantCity ?? '',
       preferredContactTime: app.preferredContactTime
         ? CONTACT_TIME_LABELS[app.preferredContactTime]
@@ -336,6 +356,18 @@ export const CONTACT_TIME_TO_BACKEND: Record<ApplicantData['preferredContactTime
   'Pagi (09.00 - 12.00 WIB)': 'MORNING',
   'Siang (13.00 - 17.00 WIB)': 'AFTERNOON',
   'Malam (19.00 - 21.00 WIB)': 'EVENING',
+};
+
+export const SMOKING_STATUS_TO_BACKEND: Record<NonNullable<ApplicantData['smokingStatus']>, BackendSmokingStatus> = {
+  'Tidak Pernah': 'NEVER',
+  'Mantan Perokok': 'FORMER',
+  'Perokok Aktif': 'CURRENT',
+};
+
+export const ALCOHOL_USE_TO_BACKEND: Record<NonNullable<ApplicantData['alcoholUse']>, BackendAlcoholUse> = {
+  'Tidak Pernah': 'NEVER',
+  Sesekali: 'OCCASIONAL',
+  Rutin: 'REGULAR',
 };
 
 /**

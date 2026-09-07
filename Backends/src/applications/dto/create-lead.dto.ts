@@ -1,6 +1,6 @@
 import { Type } from 'class-transformer';
-import { IsBoolean, IsEmail, IsEnum, IsInt, IsOptional, IsString, Min, MinLength, ValidateNested } from 'class-validator';
-import { ContactTime } from '@prisma/client';
+import { IsBoolean, IsDateString, IsEmail, IsEnum, IsInt, IsNumber, IsOptional, IsString, Min, MinLength, ValidateNested } from 'class-validator';
+import { AlcoholUse, ContactTime, SmokingStatus } from '@prisma/client';
 
 /**
  * Deliberately minimal compared to ApplicantDto (create-application.dto.ts):
@@ -26,6 +26,34 @@ class LeadApplicantDto {
   @IsInt()
   @Min(0)
   age?: number;
+
+  /** ISO date string - staff usually fill this in later, during the call, not at capture time. */
+  @IsOptional()
+  @IsDateString()
+  dob?: string;
+
+  /** Health/medical intake - same story as dob above, usually filled in later by staff. */
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  heightCm?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  weightKg?: number;
+
+  @IsOptional()
+  @IsEnum(SmokingStatus)
+  smokingStatus?: SmokingStatus;
+
+  @IsOptional()
+  @IsEnum(AlcoholUse)
+  alcoholUse?: AlcoholUse;
+
+  @IsOptional()
+  @IsString()
+  medicalHistory?: string;
 
   @IsOptional()
   @IsString()

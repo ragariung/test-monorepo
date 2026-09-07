@@ -65,6 +65,18 @@ enum ContactTime {
   EVENING
 }
 
+enum SmokingStatus {
+  NEVER
+  FORMER
+  CURRENT
+}
+
+enum AlcoholUse {
+  NEVER
+  OCCASIONAL
+  REGULAR
+}
+
 model User {
   id           String    @id @default(uuid())
   email        String    @unique
@@ -230,6 +242,25 @@ model Application {
   applicantEmail       String?
   applicantPhone       String?
   applicantAge         Int?
+  // Nullable for the same reason as applicantAge above (a lead may not have
+  // it yet); genuinely optional even for a formal submission - kept
+  // alongside applicantAge (which still drives simulation/eligibility) as
+  // additional identity data, not a replacement for it.
+  applicantDob         DateTime?              @db.Date
+  // Health/medical intake - same story as applicantDob above: not collected
+  // on the public form or by the chatbot, filled in by staff during their
+  // call with the prospect (Frontends/'s "Edit Prospek" form). Genuinely
+  // optional even after a formal submission - underwriting can still request
+  // it later through the normal review process if it's missing.
+  applicantHeightCm    Int?
+  applicantWeightKg    Float?
+  smokingStatus        SmokingStatus?
+  alcoholUse           AlcoholUse?
+  // Free text: specific medical conditions, surgeries, or hospitalizations -
+  // deliberately not a structured conditions picker (a fixed taxonomy of
+  // conditions is unnecessary complexity for this MVP; a narrative field is
+  // exactly what a phone-call intake produces anyway).
+  medicalHistory       String?
   applicantCity        String?
   preferredContactTime ContactTime?
   applicantNotes       String?
