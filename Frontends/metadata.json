@@ -1,0 +1,6 @@
+{
+  "name": "PRAXIS Insurance",
+  "description": "Two-surface digital insurance product discovery, premium illustration, and lead application platform with internal admin workflow portal.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
