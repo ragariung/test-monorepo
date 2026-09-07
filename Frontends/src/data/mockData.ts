@@ -454,7 +454,8 @@ export const INITIAL_STAFF: StaffUser[] = [
     email: 'bambang.soedirman@praxis.co.id',
     role: 'Underwriter Manager',
     department: 'Underwriting & Risk Governance',
-    assignedCount: 4
+    assignedCount: 4,
+    isActive: true,
   },
   {
     id: 'staff-2',
@@ -463,6 +464,7 @@ export const INITIAL_STAFF: StaffUser[] = [
     role: 'Senior Underwriter',
     department: 'Life & Medical Assessment',
     assignedCount: 6,
+    isActive: true,
     managerId: 'staff-1',
     managerName: 'Bambang Soedirman'
   },
@@ -473,6 +475,7 @@ export const INITIAL_STAFF: StaffUser[] = [
     role: 'Senior Underwriter',
     department: 'Wealth & Legacy Solutions',
     assignedCount: 5,
+    isActive: true,
     managerId: 'staff-1',
     managerName: 'Bambang Soedirman'
   },
@@ -483,6 +486,7 @@ export const INITIAL_STAFF: StaffUser[] = [
     role: 'Tele-Consultant',
     department: 'Digital Lead Qualification',
     assignedCount: 8,
+    isActive: true,
     managerId: 'staff-1',
     managerName: 'Bambang Soedirman'
   }

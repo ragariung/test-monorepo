@@ -48,9 +48,24 @@ export function roleLabel(role: BackendStaffRole): StaffUser['role'] {
   return ROLE_LABELS[role] ?? (role as StaffUser['role']);
 }
 
+// [backend enum value, frontend label] pairs, in the same fixed display
+// order as ROLE_LABELS - used to build the role <select> in OrganizationView's
+// "invite employee" form and the capability matrix's column order.
+export const STAFF_ROLE_OPTIONS: [BackendStaffRole, StaffUser['role']][] = (
+  Object.entries(ROLE_LABELS) as [BackendStaffRole, StaffUser['role']][]
+);
+
 /** managerId->fullName lookup must be built from the full users list first (see AppContext). */
 export function adaptUser(
-  user: { id: string; email: string; fullName: string; role: BackendStaffRole; department: string | null; managerId: string | null },
+  user: {
+    id: string;
+    email: string;
+    fullName: string;
+    role: BackendStaffRole;
+    department: string | null;
+    managerId: string | null;
+    isActive: boolean;
+  },
   managerNameById: Map<string, string>,
 ): StaffUser {
   return {
@@ -59,9 +74,10 @@ export function adaptUser(
     email: user.email,
     role: roleLabel(user.role),
     department: user.department ?? '',
-    assignedCount: 0, // not tracked by the backend in v0; only used by the not-yet-wired OrganizationView
+    assignedCount: 0, // not tracked by the backend in v0
     managerId: user.managerId ?? undefined,
     managerName: user.managerId ? managerNameById.get(user.managerId) : undefined,
+    isActive: user.isActive,
   };
 }
 

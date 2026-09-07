@@ -13,7 +13,7 @@ import {
 import {
   INITIAL_SIMULATION_RULES
 } from '../data/mockData';
-import { authApi, adminApplicationsApi, adminUsersApi, adminAuditApi, publicApi, ApiError } from '../lib/api';
+import { authApi, adminApplicationsApi, adminUsersApi, adminAuditApi, publicApi, ApiError, BackendStaffRole } from '../lib/api';
 import {
   adaptApplicationDetail,
   adaptAuditLog,
@@ -68,6 +68,16 @@ interface AppContextType {
   ) => Promise<void>;
   convertLead: (appId: string) => Promise<void>;
   declineLead: (appId: string, reason: string) => Promise<void>;
+  createStaffUser: (input: {
+    email: string;
+    fullName: string;
+    role: BackendStaffRole;
+    department?: string;
+    managerId?: string | null;
+    password: string;
+  }) => Promise<void>;
+  updateStaffManager: (userId: string, managerId: string | null) => Promise<void>;
+  fetchRolePermissions: () => Promise<Record<BackendStaffRole, string[]>>;
   updateProduct: (productIdOrUpdated: string | Product, partial?: Partial<Product>) => void;
   toasts: ToastMessage[];
   showToast: (title: string, message: string, type?: 'success' | 'info' | 'warning' | 'error') => void;
@@ -425,6 +435,42 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   // ---------------------------------------------------------------------
+  // Admin: organization (OrganizationView)
+  // ---------------------------------------------------------------------
+
+  const createStaffUser: AppContextType['createStaffUser'] = (input) => {
+    return adminUsersApi
+      .create(input)
+      .then(() => loadStaffAndAuditForAuthedSession())
+      .then(() => {
+        showToast('Karyawan Ditambahkan', `${input.fullName} berhasil didaftarkan.`, 'success');
+      })
+      .catch((err: unknown) => {
+        const message = err instanceof ApiError ? err.message : 'Gagal menambahkan karyawan.';
+        showToast('Gagal Menambahkan Karyawan', message, 'error');
+        throw err;
+      });
+  };
+
+  const updateStaffManager: AppContextType['updateStaffManager'] = (userId, managerId) => {
+    return adminUsersApi
+      .updateManager(userId, managerId)
+      .then(() => loadStaffAndAuditForAuthedSession())
+      .then(() => {
+        showToast('Atasan Diperbarui', 'Hierarki pelaporan berhasil diperbarui.', 'success');
+      })
+      .catch((err: unknown) => {
+        const message = err instanceof ApiError ? err.message : 'Gagal memperbarui atasan langsung.';
+        showToast('Gagal Memperbarui Atasan', message, 'error');
+        throw err;
+      });
+  };
+
+  const fetchRolePermissions: AppContextType['fetchRolePermissions'] = () => {
+    return adminUsersApi.permissions();
+  };
+
+  // ---------------------------------------------------------------------
   // Product CMS - still mock/local (Phase 2 wiring item): ProductCmsView's
   // edits are not yet persisted to PATCH /admin/products/:id.
   // ---------------------------------------------------------------------
@@ -475,6 +521,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         updateLead,
         convertLead,
         declineLead,
+        createStaffUser,
+        updateStaffManager,
+        fetchRolePermissions,
         updateProduct,
         toasts,
         showToast,

@@ -415,6 +415,9 @@ export const adminUsersApi = {
   }) => request<BackendUser>('/admin/users', { method: 'POST', body: JSON.stringify(dto) }),
   updateManager: (id: string, managerId: string | null) =>
     request<BackendUser>(`/admin/users/${id}/manager`, { method: 'PATCH', body: JSON.stringify({ managerId }) }),
+  // The real role-permissions.ts map (Backends/src/auth/role-permissions.ts),
+  // served as-is - see OrganizationView's capability matrix tab.
+  permissions: () => request<Record<BackendStaffRole, string[]>>('/admin/users/permissions'),
 };
 
 // ---------------------------------------------------------------------------

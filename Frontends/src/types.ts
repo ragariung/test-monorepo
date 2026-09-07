@@ -146,6 +146,7 @@ export interface StaffUser {
   assignedCount: number;
   managerId?: string;
   managerName?: string;
+  isActive: boolean;
 }
 
 export interface AuditLogEntry {
