@@ -51,6 +51,7 @@ export class SimulatorService {
         sumAssured: dto.sumAssured,
         paymentTermYears: dto.paymentTermYears,
         paymentFrequency: dto.paymentFrequency,
+        sessionId: dto.sessionId,
         isValid: result.isValid,
         validationError: result.validationError,
         monthlyPremium: result.monthlyPremium,

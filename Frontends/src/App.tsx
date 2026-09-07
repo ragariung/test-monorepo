@@ -3,6 +3,7 @@ import { AppProvider, useApp } from './context/AppContext';
 import { Navbar } from './components/common/Navbar';
 import { Footer } from './components/common/Footer';
 import { ToastContainer } from './components/common/ToastContainer';
+import { ChatWidget } from './components/common/ChatWidget';
 
 // Public views
 import { HomeView } from './views/public/HomeView';
@@ -104,6 +105,7 @@ const RouterView: React.FC = () => {
         {publicContent}
       </main>
       <Footer />
+      <ChatWidget />
     </div>
   );
 };

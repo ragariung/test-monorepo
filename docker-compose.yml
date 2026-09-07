@@ -39,13 +39,42 @@ services:
     environment:
       # Consumed by Frontends/src/lib/api.ts for every real backend call.
       VITE_API_BASE_URL: http://localhost:3001/api/v1
+      # Consumed by Frontends/src/lib/chat-api.ts (the ChatWidget). Must match
+      # the "Chat Trigger" node's webhookId in Automation/workflows/praxis-assistant-001.json.
+      VITE_CHAT_WEBHOOK_URL: http://localhost:5678/webhook/72ce3642-177d-4104-be42-558158ac11d4/chat
     volumes:
       - ./Frontends:/app
       - frontend_node_modules:/app/node_modules
     depends_on:
       - backend
 
+  n8n:
+    image: n8nio/n8n:2.37.10
+    ports:
+      - "5678:5678"
+    environment:
+      N8N_HOST: localhost
+      N8N_PORT: "5678"
+      N8N_PROTOCOL: http
+      GENERIC_TIMEZONE: Asia/Jakarta
+      # No basic-auth env vars: N8N_BASIC_AUTH_ACTIVE is deprecated/non-functional
+      # in n8n v2 (confirmed live - verified requests succeed with or without
+      # credentials). n8n v2 uses its own built-in user accounts instead - the
+      # first person to open http://localhost:5678 gets a one-time setup screen
+      # to create an owner login. See Automation/README.md.
+      # Encrypts stored n8n credentials (e.g. the Gemini API key set in the
+      # n8n UI). Must stay fixed and identical across machines - see
+      # Automation/README.md.
+      N8N_ENCRYPTION_KEY: change-me-in-production-use-a-real-random-key
+    volumes:
+      - n8n_data:/home/node/.n8n
+      # Bind mount, not a named volume: exported workflow JSON lands here on
+      # the host, inside Automation/workflows/, so it's an ordinary git-tracked
+      # file - see Automation/scripts/ and Automation/README.md.
+      - ./Automation/workflows:/home/node/n8n-workflows
+
 volumes:
   pgdata:
   backend_node_modules:
   frontend_node_modules:
+  n8n_data:
