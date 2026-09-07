@@ -1,10 +1,11 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { ApplicationStatus, Prisma, SimulationRun } from '@prisma/client';
+import { ApplicationStatus, Prisma, SimulationRun, StaffRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
@@ -98,6 +99,12 @@ export class ApplicationsService {
           applicantEmail: dto.applicant.email,
           applicantPhone: dto.applicant.phone,
           applicantAge: dto.applicant.age,
+          applicantDob: dto.applicant.dob ? new Date(dto.applicant.dob) : undefined,
+          applicantHeightCm: dto.applicant.heightCm,
+          applicantWeightKg: dto.applicant.weightKg,
+          smokingStatus: dto.applicant.smokingStatus,
+          alcoholUse: dto.applicant.alcoholUse,
+          medicalHistory: dto.applicant.medicalHistory,
           applicantCity: dto.applicant.city,
           preferredContactTime: dto.applicant.preferredContactTime,
           applicantNotes: dto.applicant.notes,
@@ -236,6 +243,12 @@ export class ApplicationsService {
           applicantEmail: dto.applicant.email,
           applicantPhone: dto.applicant.phone,
           applicantAge: dto.applicant.age,
+          applicantDob: dto.applicant.dob ? new Date(dto.applicant.dob) : undefined,
+          applicantHeightCm: dto.applicant.heightCm,
+          applicantWeightKg: dto.applicant.weightKg,
+          smokingStatus: dto.applicant.smokingStatus,
+          alcoholUse: dto.applicant.alcoholUse,
+          medicalHistory: dto.applicant.medicalHistory,
           applicantCity: dto.applicant.city,
           preferredContactTime: dto.applicant.preferredContactTime,
           applicantNotes: dto.applicant.notes,
@@ -320,6 +333,12 @@ export class ApplicationsService {
       if (a.email !== undefined) updateData.applicantEmail = a.email;
       if (a.phone !== undefined) updateData.applicantPhone = a.phone;
       if (a.age !== undefined) updateData.applicantAge = a.age;
+      if (a.dob !== undefined) updateData.applicantDob = new Date(a.dob);
+      if (a.heightCm !== undefined) updateData.applicantHeightCm = a.heightCm;
+      if (a.weightKg !== undefined) updateData.applicantWeightKg = a.weightKg;
+      if (a.smokingStatus !== undefined) updateData.smokingStatus = a.smokingStatus;
+      if (a.alcoholUse !== undefined) updateData.alcoholUse = a.alcoholUse;
+      if (a.medicalHistory !== undefined) updateData.medicalHistory = a.medicalHistory;
       if (a.city !== undefined) updateData.applicantCity = a.city;
       if (a.preferredContactTime !== undefined) updateData.preferredContactTime = a.preferredContactTime;
       if (a.notes !== undefined) updateData.applicantNotes = a.notes;
@@ -355,7 +374,7 @@ export class ApplicationsService {
       description: `Memperbarui data prospek ${dto.applicant?.fullName ?? application.applicantFullName} setelah dihubungi.`,
     });
 
-    return this.detail(id);
+    return this.detail(id, actingUser);
   }
 
   /**
@@ -429,7 +448,52 @@ export class ApplicationsService {
   // Admin: inbox / detail
   // ---------------------------------------------------------------------
 
-  async listInbox(query: QueryApplicationsDto) {
+  /**
+   * Admin, Underwriter Manager, and Auditor see every application (the first
+   * two because they're the ones assigning/reviewing/managing across the
+   * whole team; Auditor because its entire purpose is compliance oversight
+   * of everything - nothing is ever "assigned" to an auditor, so scoping
+   * them the same as everyone else would leave the role permanently unable
+   * to see anything). Every other role (Senior Underwriter, Underwriter,
+   * Tele-Consultant) only sees non-DRAFT applications currently assigned to
+   * them - DRAFT leads (chatbot-captured, Automation/) are exempt, see
+   * assignmentScopeWhere() below.
+   */
+  private static readonly UNRESTRICTED_ROLES: StaffRole[] = [
+    StaffRole.ADMIN,
+    StaffRole.UNDERWRITER_MANAGER,
+    StaffRole.AUDITOR,
+  ];
+
+  private isScopedToOwnAssignments(role: StaffRole): boolean {
+    return !ApplicationsService.UNRESTRICTED_ROLES.includes(role);
+  }
+
+  /**
+   * Prisma where-fragment restricting to the acting user's own current
+   * assignments, or {} if their role has unrestricted visibility.
+   *
+   * DRAFT leads are always included regardless of assignment: they're an
+   * unclaimed pool by design (POST /leads never assigns one to anyone), so
+   * a scoped role still needs to see them to do the lead-management work
+   * updateLead()/convertLeadToApplication()/declineLead() exist for. The
+   * restriction is really about the formal review pipeline (once an
+   * application is SUBMITTED, only its assignee - or an unrestricted role -
+   * can see it), not about leads that haven't been claimed by anyone yet.
+   */
+  private assignmentScopeWhere(actingUser: AuthenticatedUser): Prisma.ApplicationWhereInput {
+    if (!this.isScopedToOwnAssignments(actingUser.role)) {
+      return {};
+    }
+    return {
+      OR: [
+        { status: ApplicationStatus.DRAFT },
+        { assignments: { some: { assignedToId: actingUser.id, unassignedAt: null } } },
+      ],
+    };
+  }
+
+  async listInbox(query: QueryApplicationsDto, actingUser: AuthenticatedUser) {
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? 20;
 
@@ -441,7 +505,13 @@ export class ApplicationsService {
     if (query.productId) {
       where.productId = query.productId;
     }
-    if (query.assignedTo === 'unassigned') {
+
+    if (this.isScopedToOwnAssignments(actingUser.role)) {
+      // A scoped role's own visibility always wins - ignore whatever
+      // assignedTo the query string asked for (e.g. someone else's id, or
+      // "unassigned") rather than let it override the restriction.
+      Object.assign(where, this.assignmentScopeWhere(actingUser));
+    } else if (query.assignedTo === 'unassigned') {
       where.assignments = { none: { unassignedAt: null } };
     } else if (query.assignedTo) {
       where.assignments = {
@@ -497,7 +567,7 @@ export class ApplicationsService {
     };
   }
 
-  async detail(id: string) {
+  async detail(id: string, actingUser: AuthenticatedUser) {
     const application = await this.prisma.application.findUnique({
       where: { id },
       include: {
@@ -524,6 +594,15 @@ export class ApplicationsService {
     }
 
     const { assignments, ...rest } = application;
+
+    if (
+      this.isScopedToOwnAssignments(actingUser.role) &&
+      application.status !== ApplicationStatus.DRAFT &&
+      assignments[0]?.assignedTo?.id !== actingUser.id
+    ) {
+      throw new ForbiddenException('This application is not assigned to you');
+    }
+
     return {
       ...rest,
       assignedTo: assignments[0]?.assignedTo ?? null,
@@ -705,7 +784,7 @@ export class ApplicationsService {
       description,
     });
 
-    return this.detail(id);
+    return this.detail(id, actingUser);
   }
 
   // ---------------------------------------------------------------------
@@ -731,20 +810,27 @@ export class ApplicationsService {
   // ---------------------------------------------------------------------
 
   async dashboardSummary(actingUser: AuthenticatedUser) {
+    const scoped = this.isScopedToOwnAssignments(actingUser.role);
+    const scopeWhere = this.assignmentScopeWhere(actingUser);
+
+    // A scoped role never sees the unassigned pool at all (they can't be
+    // assigned nothing), so that count would be meaningless to them - and
+    // clicking it would land on an inbox filter they can't actually see
+    // anything through. Skip the query entirely and report 0.
     const [
       submittedCount,
       underReviewCount,
       approvedCount,
       rejectedCount,
       assignedToMeCount,
-      unassignedCount,
+      unassignedCountRaw,
       recentApplicationsRaw,
       recentAuditLogs,
     ] = await this.prisma.$transaction([
-      this.prisma.application.count({ where: { status: ApplicationStatus.SUBMITTED } }),
-      this.prisma.application.count({ where: { status: ApplicationStatus.UNDER_REVIEW } }),
-      this.prisma.application.count({ where: { status: ApplicationStatus.APPROVED } }),
-      this.prisma.application.count({ where: { status: ApplicationStatus.REJECTED } }),
+      this.prisma.application.count({ where: { status: ApplicationStatus.SUBMITTED, ...scopeWhere } }),
+      this.prisma.application.count({ where: { status: ApplicationStatus.UNDER_REVIEW, ...scopeWhere } }),
+      this.prisma.application.count({ where: { status: ApplicationStatus.APPROVED, ...scopeWhere } }),
+      this.prisma.application.count({ where: { status: ApplicationStatus.REJECTED, ...scopeWhere } }),
       this.prisma.application.count({
         where: { assignments: { some: { assignedToId: actingUser.id, unassignedAt: null } } },
       }),
@@ -752,6 +838,7 @@ export class ApplicationsService {
         where: { assignments: { none: { unassignedAt: null } } },
       }),
       this.prisma.application.findMany({
+        where: scopeWhere,
         include: INBOX_INCLUDE,
         orderBy: { submittedAt: 'desc' },
         take: 5,
@@ -768,7 +855,7 @@ export class ApplicationsService {
       approvedCount,
       rejectedCount,
       assignedToMeCount,
-      unassignedCount,
+      unassignedCount: scoped ? 0 : unassignedCountRaw,
       recentApplications: recentApplicationsRaw.map((row) => this.mapInboxRow(row)),
       recentAuditLogs,
     };

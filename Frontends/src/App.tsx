@@ -26,15 +26,22 @@ import { AuditLogView } from './views/admin/AuditLogView';
 const RouterView: React.FC = () => {
   const { currentPath, authLoading, isAdminLoggedIn } = useApp();
 
+  // Route matching only ever cares about the path itself - strip any query
+  // string (e.g. "/admin/applications?status=Submitted", used by the
+  // dashboard's summary cards to deep-link into a pre-filtered inbox) before
+  // every comparison below. The views that care about query params (e.g.
+  // ApplicationsInboxView) read window.location.search themselves.
+  const pathname = currentPath.split('?')[0];
+
   // Route matching helpers
-  if (currentPath === '/admin/login' || currentPath === '/login') {
+  if (pathname === '/admin/login' || pathname === '/login') {
     return <AdminLoginView />;
   }
 
   // Auth guard: any other /admin/* route requires a real, verified session
   // (GET /me on load). While that check is in flight, render nothing rather
   // than flashing the login screen for an already-authenticated user.
-  if (currentPath.startsWith('/admin')) {
+  if (pathname.startsWith('/admin')) {
     if (authLoading) {
       return null;
     }
@@ -43,55 +50,55 @@ const RouterView: React.FC = () => {
     }
   }
 
-  if (currentPath === '/admin/dashboard') {
+  if (pathname === '/admin/dashboard') {
     return <AdminDashboardView />;
   }
 
-  if (currentPath === '/admin/applications') {
+  if (pathname === '/admin/applications') {
     return <ApplicationsInboxView />;
   }
 
-  if (currentPath.startsWith('/admin/applications/')) {
-    const id = currentPath.replace('/admin/applications/', '');
+  if (pathname.startsWith('/admin/applications/')) {
+    const id = pathname.replace('/admin/applications/', '');
     return <ApplicationDetailView id={id} />;
   }
 
-  if (currentPath === '/admin/products') {
+  if (pathname === '/admin/products') {
     return <ProductCmsView />;
   }
 
-  if (currentPath.includes('/simulation-rules')) {
-    const parts = currentPath.split('/');
+  if (pathname.includes('/simulation-rules')) {
+    const parts = pathname.split('/');
     const slugIndex = parts.indexOf('products') + 1;
     const slug = parts[slugIndex] || 'praxis-jiwa-utama';
     return <SimulationRulesView slug={slug} />;
   }
 
-  if (currentPath === '/admin/organization' || currentPath === '/admin/users' || currentPath === '/admin/roles') {
+  if (pathname === '/admin/organization' || pathname === '/admin/users' || pathname === '/admin/roles') {
     return <OrganizationView />;
   }
 
-  if (currentPath === '/admin/audit') {
+  if (pathname === '/admin/audit') {
     return <AuditLogView />;
   }
 
   // Public surface routes (Rendered with Public Navbar & Footer)
   let publicContent: React.ReactNode;
 
-  if (currentPath === '/' || currentPath === '') {
+  if (pathname === '/' || pathname === '') {
     publicContent = <HomeView />;
-  } else if (currentPath === '/products') {
+  } else if (pathname === '/products') {
     publicContent = <CatalogueView />;
-  } else if (currentPath.startsWith('/products/') && currentPath.endsWith('/simulate')) {
-    const slug = currentPath.replace('/products/', '').replace('/simulate', '');
+  } else if (pathname.startsWith('/products/') && pathname.endsWith('/simulate')) {
+    const slug = pathname.replace('/products/', '').replace('/simulate', '');
     publicContent = <SimulatorView slug={slug} />;
-  } else if (currentPath.startsWith('/products/')) {
-    const slug = currentPath.replace('/products/', '');
+  } else if (pathname.startsWith('/products/')) {
+    const slug = pathname.replace('/products/', '');
     publicContent = <ProductDetailView slug={slug} />;
-  } else if (currentPath === '/apply') {
+  } else if (pathname === '/apply') {
     publicContent = <ApplyView />;
-  } else if (currentPath.startsWith('/application/success')) {
-    const ref = currentPath.replace('/application/success/', '');
+  } else if (pathname.startsWith('/application/success')) {
+    const ref = pathname.replace('/application/success/', '');
     publicContent = <SuccessView reference={ref} />;
   } else {
     // Fallback to HomeView

@@ -19,14 +19,14 @@ export class AdminApplicationsController {
 
   @Get()
   @RequirePermission('applications:read')
-  list(@Query() query: QueryApplicationsDto) {
-    return this.applicationsService.listInbox(query);
+  list(@Query() query: QueryApplicationsDto, @CurrentUser() user: AuthenticatedUser) {
+    return this.applicationsService.listInbox(query, user);
   }
 
   @Get(':id')
   @RequirePermission('applications:read')
-  detail(@Param('id') id: string) {
-    return this.applicationsService.detail(id);
+  detail(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.applicationsService.detail(id, user);
   }
 
   @Post(':id/start-review')

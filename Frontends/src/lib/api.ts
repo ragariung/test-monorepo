@@ -86,6 +86,8 @@ export type BackendProductCategory =
 export type BackendPaymentFrequency = 'MONTHLY' | 'QUARTERLY' | 'SEMI_ANNUAL' | 'ANNUAL';
 export type BackendContactTime = 'MORNING' | 'AFTERNOON' | 'EVENING';
 export type BackendDocumentType = 'BROCHURE' | 'RIPLAY' | 'TERMS' | 'OTHER';
+export type BackendSmokingStatus = 'NEVER' | 'FORMER' | 'CURRENT';
+export type BackendAlcoholUse = 'NEVER' | 'OCCASIONAL' | 'REGULAR';
 
 export interface BackendProductBenefit {
   id: string;
@@ -188,6 +190,17 @@ export interface BackendApplicationDetail {
   applicantEmail: string | null;
   applicantPhone: string | null;
   applicantAge: number | null;
+  // ISO date string (e.g. "1990-05-15T00:00:00.000Z") - additional identity
+  // data staff typically fill in later during contact, not a replacement
+  // for applicantAge (which still drives simulation/eligibility).
+  applicantDob: string | null;
+  // Health/medical intake - same story as applicantDob: filled in by staff
+  // during contact, not on the public form.
+  applicantHeightCm: number | null;
+  applicantWeightKg: number | null;
+  smokingStatus: BackendSmokingStatus | null;
+  alcoholUse: BackendAlcoholUse | null;
+  medicalHistory: string | null;
   applicantCity: string | null;
   preferredContactTime: BackendContactTime | null;
   applicantNotes: string | null;
@@ -330,6 +343,12 @@ export const adminApplicationsApi = {
         email?: string;
         phone?: string;
         age?: number;
+        dob?: string;
+        heightCm?: number;
+        weightKg?: number;
+        smokingStatus?: BackendSmokingStatus;
+        alcoholUse?: BackendAlcoholUse;
+        medicalHistory?: string;
         city?: string;
         preferredContactTime?: BackendContactTime;
         notes?: string;

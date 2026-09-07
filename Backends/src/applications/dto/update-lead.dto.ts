@@ -1,5 +1,6 @@
 import { Type } from 'class-transformer';
 import {
+  IsDateString,
   IsEmail,
   IsEnum,
   IsInt,
@@ -10,7 +11,7 @@ import {
   MinLength,
   ValidateNested,
 } from 'class-validator';
-import { ContactTime, PaymentFrequency } from '@prisma/client';
+import { AlcoholUse, ContactTime, PaymentFrequency, SmokingStatus } from '@prisma/client';
 
 /**
  * Every field optional - a partial update. Staff editing a DRAFT lead after
@@ -37,6 +38,34 @@ class UpdateLeadApplicantDto {
   @IsInt()
   @Min(0)
   age?: number;
+
+  /** ISO date string - typically filled in here, by staff, during the call. */
+  @IsOptional()
+  @IsDateString()
+  dob?: string;
+
+  /** Health/medical intake - the primary entry point for all five of these. */
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  heightCm?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  weightKg?: number;
+
+  @IsOptional()
+  @IsEnum(SmokingStatus)
+  smokingStatus?: SmokingStatus;
+
+  @IsOptional()
+  @IsEnum(AlcoholUse)
+  alcoholUse?: AlcoholUse;
+
+  @IsOptional()
+  @IsString()
+  medicalHistory?: string;
 
   @IsOptional()
   @IsString()

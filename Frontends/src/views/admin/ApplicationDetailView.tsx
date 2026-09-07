@@ -19,7 +19,12 @@ import {
   ExternalLink,
   Edit3,
   ArrowRightCircle,
-  Ban
+  Ban,
+  HeartPulse,
+  Ruler,
+  Weight,
+  Cigarette,
+  Wine
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { AdminLayout } from '../../components/admin/AdminLayout';
@@ -27,15 +32,28 @@ import { StatusChip } from '../../components/common/StatusChip';
 import { Button } from '../../components/common/Button';
 import { Modal } from '../../components/common/Modal';
 import { formatIDR } from '../../data/mockData';
-import { ApplicationStatus, PaymentFrequency } from '../../types';
+import { ApplicantData, ApplicationStatus, PaymentFrequency } from '../../types';
 
 interface ApplicationDetailViewProps {
   id?: string;
 }
 
+/** Whole years between an ISO "YYYY-MM-DD" dob string and today. */
+function calculateAgeFromDob(dobIso: string): number {
+  const dob = new Date(dobIso);
+  const today = new Date();
+  let age = today.getFullYear() - dob.getFullYear();
+  const monthDiff = today.getMonth() - dob.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
+    age -= 1;
+  }
+  return Math.max(age, 0);
+}
+
 export const ApplicationDetailView: React.FC<ApplicationDetailViewProps> = ({ id }) => {
   const {
     applications,
+    applicationDetailError,
     staffList,
     products,
     updateApplicationStatus,
@@ -48,7 +66,13 @@ export const ApplicationDetailView: React.FC<ApplicationDetailViewProps> = ({ id
     auditLogs
   } = useApp();
 
-  const application = applications.find((a) => a.id === id) || applications[0];
+  // No "|| applications[0]" fallback here on purpose: silently substituting
+  // a different application when this id isn't in local state would be
+  // actively misleading, not just a placeholder - especially now that a
+  // scoped role (see Backends/'s applications:read scoping) will
+  // legitimately 403 on an id that isn't theirs.
+  const application = applications.find((a) => a.id === id);
+  const detailError = applicationDetailError?.id === id ? applicationDetailError : null;
 
   // Rejection modal state
   const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
@@ -70,6 +94,12 @@ export const ApplicationDetailView: React.FC<ApplicationDetailViewProps> = ({ id
     email: '',
     phone: '',
     age: 0,
+    dob: '',
+    heightCm: 0,
+    weightKg: 0,
+    smokingStatus: '' as '' | NonNullable<ApplicantData['smokingStatus']>,
+    alcoholUse: '' as '' | NonNullable<ApplicantData['alcoholUse']>,
+    medicalHistory: '',
     city: '',
     notes: '',
     updateSimulation: false,
@@ -85,10 +115,25 @@ export const ApplicationDetailView: React.FC<ApplicationDetailViewProps> = ({ id
   const [isDeclining, setIsDeclining] = useState(false);
 
   if (!application) {
+    // Still loading: haven't seen this id in local state yet, but no error
+    // has come back either - the detail fetch in AppContext is in flight.
+    if (!detailError) {
+      return (
+        <AdminLayout activeNav="applications" title="Memuat...">
+          <div className="bg-white p-8 rounded-xl text-center text-sm text-slate-400">Memuat detail aplikasi...</div>
+        </AdminLayout>
+      );
+    }
+
+    const isForbidden = detailError.status === 403;
     return (
-      <AdminLayout activeNav="applications" title="Aplikasi Tidak Ditemukan">
+      <AdminLayout activeNav="applications" title={isForbidden ? 'Akses Ditolak' : 'Aplikasi Tidak Ditemukan'}>
         <div className="bg-white p-8 rounded-xl text-center space-y-3">
-          <p className="text-slate-600 text-sm">Aplikasi dengan ID tersebut tidak ditemukan dalam sistem.</p>
+          <p className="text-slate-600 text-sm">
+            {isForbidden
+              ? 'Aplikasi ini tidak ditugaskan kepada Anda, sehingga tidak dapat diakses.'
+              : 'Aplikasi dengan ID tersebut tidak ditemukan dalam sistem.'}
+          </p>
           <Button variant="secondary" size="sm" onClick={() => navigate('/admin/applications')}>
             Kembali ke Kotak Masuk
           </Button>
@@ -127,6 +172,12 @@ export const ApplicationDetailView: React.FC<ApplicationDetailViewProps> = ({ id
       email: application.applicant.email,
       phone: application.applicant.phone,
       age: application.applicant.age,
+      dob: application.applicant.dob ?? '',
+      heightCm: application.applicant.heightCm ?? 0,
+      weightKg: application.applicant.weightKg ?? 0,
+      smokingStatus: application.applicant.smokingStatus ?? '',
+      alcoholUse: application.applicant.alcoholUse ?? '',
+      medicalHistory: application.applicant.medicalHistory ?? '',
       city: application.applicant.city,
       notes: application.applicant.notes ?? '',
       updateSimulation: false,
@@ -147,6 +198,12 @@ export const ApplicationDetailView: React.FC<ApplicationDetailViewProps> = ({ id
         email: editForm.email,
         phone: editForm.phone,
         age: editForm.age,
+        dob: editForm.dob || undefined,
+        heightCm: editForm.heightCm || undefined,
+        weightKg: editForm.weightKg || undefined,
+        smokingStatus: editForm.smokingStatus || undefined,
+        alcoholUse: editForm.alcoholUse || undefined,
+        medicalHistory: editForm.medicalHistory || undefined,
         city: editForm.city,
         notes: editForm.notes,
       },
@@ -184,6 +241,10 @@ export const ApplicationDetailView: React.FC<ApplicationDetailViewProps> = ({ id
   };
 
   const selectedProductForEdit = products.find((p) => p.id === editForm.productId);
+  const ageOutOfProductRange =
+    !!selectedProductForEdit &&
+    editForm.age > 0 &&
+    (editForm.age < selectedProductForEdit.minAge || editForm.age > selectedProductForEdit.maxAge);
 
   // Filter audit logs for this application
   const appAuditLogs = auditLogs.filter(
@@ -355,6 +416,17 @@ export const ApplicationDetailView: React.FC<ApplicationDetailViewProps> = ({ id
                 </div>
 
                 <div className="space-y-1">
+                  <span className="text-gray-400 font-medium">Tanggal Lahir:</span>
+                  <div className="font-bold text-[#111827]">
+                    {application.applicant.dob ? (
+                      new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(application.applicant.dob))
+                    ) : (
+                      <span className="text-gray-400 italic font-medium">Belum diisi</span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-1">
                   <span className="text-gray-400 font-medium">Nomor Telepon / WhatsApp:</span>
                   <div className="font-bold text-[#111827] flex items-center gap-1.5">
                     <Phone className="w-3.5 h-3.5 text-gray-400" />
@@ -394,6 +466,71 @@ export const ApplicationDetailView: React.FC<ApplicationDetailViewProps> = ({ id
                     </p>
                   </div>
                 )}
+              </div>
+            </div>
+
+            {/* Health/Medical Intake Card */}
+            <div className="bg-white rounded-[28px] border border-gray-100 p-6 sm:p-7 shadow-soft space-y-5">
+              <div className="flex items-center gap-2 border-b border-gray-100 pb-3.5">
+                <HeartPulse className="w-4 h-4 text-[#0F4C5C]" />
+                <h3 className="text-sm font-bold text-[#111827]">Riwayat Kesehatan</h3>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 text-xs">
+                <div className="space-y-1">
+                  <span className="text-gray-400 font-medium flex items-center gap-1.5">
+                    <Ruler className="w-3.5 h-3.5" /> Tinggi Badan:
+                  </span>
+                  <div className="font-bold text-[#111827]">
+                    {application.applicant.heightCm ? `${application.applicant.heightCm} cm` : (
+                      <span className="text-gray-400 italic font-medium">Belum diisi</span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <span className="text-gray-400 font-medium flex items-center gap-1.5">
+                    <Weight className="w-3.5 h-3.5" /> Berat Badan:
+                  </span>
+                  <div className="font-bold text-[#111827]">
+                    {application.applicant.weightKg ? `${application.applicant.weightKg} kg` : (
+                      <span className="text-gray-400 italic font-medium">Belum diisi</span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <span className="text-gray-400 font-medium flex items-center gap-1.5">
+                    <Cigarette className="w-3.5 h-3.5" /> Kebiasaan Merokok:
+                  </span>
+                  <div className="font-bold text-[#111827]">
+                    {application.applicant.smokingStatus ?? (
+                      <span className="text-gray-400 italic font-medium">Belum diisi</span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <span className="text-gray-400 font-medium flex items-center gap-1.5">
+                    <Wine className="w-3.5 h-3.5" /> Kebiasaan Alkohol:
+                  </span>
+                  <div className="font-bold text-[#111827]">
+                    {application.applicant.alcoholUse ?? (
+                      <span className="text-gray-400 italic font-medium">Belum diisi</span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="sm:col-span-2 space-y-1.5 pt-3 border-t border-gray-100">
+                  <span className="text-gray-400 font-medium">Riwayat Kondisi Medis, Operasi, atau Rawat Inap:</span>
+                  {application.applicant.medicalHistory ? (
+                    <p className="text-[#111827] bg-[#F8FAFB] p-3.5 rounded-2xl border border-gray-100 leading-relaxed font-medium whitespace-pre-wrap">
+                      {application.applicant.medicalHistory}
+                    </p>
+                  ) : (
+                    <p className="text-gray-400 italic font-medium">Belum diisi</p>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -636,8 +773,32 @@ export const ApplicationDetailView: React.FC<ApplicationDetailViewProps> = ({ id
                   min={0}
                   value={editForm.age || ''}
                   onChange={(e) => setEditForm((f) => ({ ...f, age: Number(e.target.value) || 0 }))}
+                  className={`w-full px-3 py-2 text-xs bg-slate-50 border rounded-lg focus:outline-none focus:ring-2 focus:bg-white text-slate-900 ${
+                    ageOutOfProductRange
+                      ? 'border-amber-400 focus:ring-amber-400'
+                      : 'border-slate-300 focus:ring-[#0F4C5C]'
+                  }`}
+                />
+                {ageOutOfProductRange && selectedProductForEdit && (
+                  <p className="text-[10px] text-amber-700 flex items-center gap-1">
+                    <AlertTriangle className="w-3 h-3 shrink-0" />
+                    Di luar rentang usia {selectedProductForEdit.name} ({selectedProductForEdit.minAge}-{selectedProductForEdit.maxAge} tahun)
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block font-semibold text-slate-800">Tanggal Lahir</label>
+                <input
+                  type="date"
+                  value={editForm.dob}
+                  onChange={(e) => {
+                    const dob = e.target.value;
+                    setEditForm((f) => ({ ...f, dob, age: dob ? calculateAgeFromDob(dob) : f.age }));
+                  }}
                   className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F4C5C] focus:bg-white text-slate-900"
                 />
+                <p className="text-[10px] text-gray-400">Mengubah tanggal lahir otomatis memperbarui usia.</p>
               </div>
 
               <div className="space-y-1.5">
@@ -666,6 +827,70 @@ export const ApplicationDetailView: React.FC<ApplicationDetailViewProps> = ({ id
                   value={editForm.city}
                   onChange={(e) => setEditForm((f) => ({ ...f, city: e.target.value }))}
                   className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F4C5C] focus:bg-white text-slate-900"
+                />
+              </div>
+
+              <div className="sm:col-span-2 pt-2 border-t border-slate-100">
+                <p className="font-semibold text-slate-800 mb-3">Riwayat Kesehatan</p>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block font-semibold text-slate-800">Tinggi Badan (cm)</label>
+                <input
+                  type="number"
+                  min={0}
+                  value={editForm.heightCm || ''}
+                  onChange={(e) => setEditForm((f) => ({ ...f, heightCm: Number(e.target.value) || 0 }))}
+                  className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F4C5C] focus:bg-white text-slate-900"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="block font-semibold text-slate-800">Berat Badan (kg)</label>
+                <input
+                  type="number"
+                  min={0}
+                  step="0.1"
+                  value={editForm.weightKg || ''}
+                  onChange={(e) => setEditForm((f) => ({ ...f, weightKg: Number(e.target.value) || 0 }))}
+                  className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F4C5C] focus:bg-white text-slate-900"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block font-semibold text-slate-800">Kebiasaan Merokok</label>
+                <select
+                  value={editForm.smokingStatus}
+                  onChange={(e) => setEditForm((f) => ({ ...f, smokingStatus: e.target.value as typeof f.smokingStatus }))}
+                  className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F4C5C] focus:bg-white text-slate-900"
+                >
+                  <option value="">-- Belum Diisi --</option>
+                  <option value="Tidak Pernah">Tidak Pernah</option>
+                  <option value="Mantan Perokok">Mantan Perokok</option>
+                  <option value="Perokok Aktif">Perokok Aktif</option>
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <label className="block font-semibold text-slate-800">Kebiasaan Alkohol</label>
+                <select
+                  value={editForm.alcoholUse}
+                  onChange={(e) => setEditForm((f) => ({ ...f, alcoholUse: e.target.value as typeof f.alcoholUse }))}
+                  className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F4C5C] focus:bg-white text-slate-900"
+                >
+                  <option value="">-- Belum Diisi --</option>
+                  <option value="Tidak Pernah">Tidak Pernah</option>
+                  <option value="Sesekali">Sesekali</option>
+                  <option value="Rutin">Rutin</option>
+                </select>
+              </div>
+
+              <div className="space-y-1.5 sm:col-span-2">
+                <label className="block font-semibold text-slate-800">Riwayat Kondisi Medis, Operasi, atau Rawat Inap</label>
+                <textarea
+                  rows={3}
+                  value={editForm.medicalHistory}
+                  onChange={(e) => setEditForm((f) => ({ ...f, medicalHistory: e.target.value }))}
+                  placeholder="Contoh: Operasi usus buntu 2015, riwayat asma sejak kecil..."
+                  className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F4C5C] focus:bg-white text-slate-900 resize-none"
                 />
               </div>
 
