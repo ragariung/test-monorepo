@@ -1,0 +1,51 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: insurance
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d insurance"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./Backends
+    ports:
+      - "3001:3001"
+    environment:
+      DATABASE_URL: postgresql://app:app@postgres:5432/insurance
+      JWT_SECRET: change-me-in-production
+      JWT_EXPIRES_IN: 8h
+      CORS_ORIGIN: http://localhost:3000
+      PORT: 3001
+    volumes:
+      - ./Backends:/app
+      - backend_node_modules:/app/node_modules
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    build: ./Frontends
+    ports:
+      - "3000:3000"
+    environment:
+      # Consumed by Frontends/src/lib/api.ts for every real backend call.
+      VITE_API_BASE_URL: http://localhost:3001/api/v1
+    volumes:
+      - ./Frontends:/app
+      - frontend_node_modules:/app/node_modules
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
+  backend_node_modules:
+  frontend_node_modules:

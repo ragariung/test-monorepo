@@ -1,0 +1,313 @@
+{
+  "info": {
+    "name": "PRAXIS Insurance API",
+    "_postman_id": "8f2b6b6e-6b1a-4e9a-9b0a-praxisinsurancemvp",
+    "description": "Full backend API for the insurance-mvp project. Import into Postman or Insomnia (both understand this v2.1 collection format). Auth is a session cookie (praxis_session), not a bearer token: run \"Auth > Login\" first in the same collection/environment run and Postman/Insomnia's cookie jar will carry the session automatically on every request after that, since they all target the same {{baseUrl}} host. See ../Docs/API-LIST-V0.md and ../Docs/DUMMY_ACCESS.md for the authoritative endpoint list and demo credentials (any seeded email, password praxis123).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3001/api/v1" },
+    { "key": "applicationId", "value": "" },
+    { "key": "productId", "value": "" },
+    { "key": "userId", "value": "" },
+    { "key": "ruleVersionId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Operational",
+      "item": [
+        {
+          "name": "Health",
+          "request": { "method": "GET", "url": "{{baseUrl}}/health" }
+        },
+        {
+          "name": "Ready (verifies Postgres connectivity)",
+          "request": { "method": "GET", "url": "{{baseUrl}}/ready" }
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"sarah.wijaya@praxis.co.id\",\n  \"password\": \"praxis123\"\n}"
+            },
+            "url": "{{baseUrl}}/auth/login",
+            "description": "Sets an httpOnly praxis_session cookie on success (200). Any seeded email works, password praxis123 for all - see Docs/DUMMY_ACCESS.md."
+          }
+        },
+        {
+          "name": "Logout",
+          "request": { "method": "POST", "url": "{{baseUrl}}/auth/logout" }
+        },
+        {
+          "name": "Me (current session profile)",
+          "request": { "method": "GET", "url": "{{baseUrl}}/me" }
+        }
+      ]
+    },
+    {
+      "name": "Public",
+      "item": [
+        {
+          "name": "List published products",
+          "request": { "method": "GET", "url": "{{baseUrl}}/products" }
+        },
+        {
+          "name": "Get product by slug",
+          "request": { "method": "GET", "url": "{{baseUrl}}/products/praxis-jiwa-utama" }
+        },
+        {
+          "name": "Run a simulation",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productId\": \"{{productId}}\",\n  \"age\": 30,\n  \"sumAssured\": 1000000000,\n  \"paymentTermYears\": 10,\n  \"paymentFrequency\": \"MONTHLY\"\n}"
+            },
+            "url": "{{baseUrl}}/simulations",
+            "description": "paymentFrequency is one of MONTHLY | QUARTERLY | SEMI_ANNUAL | ANNUAL. Set {{productId}} from a product list response first. Returns simulationRunId - copy it into the next request."
+          }
+        },
+        {
+          "name": "Submit an application",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productId\": \"{{productId}}\",\n  \"simulationRunId\": \"PASTE_FROM_SIMULATE_RESPONSE\",\n  \"applicant\": {\n    \"fullName\": \"Budi Santoso\",\n    \"email\": \"budi.santoso@example.com\",\n    \"phone\": \"+62 812-3456-7890\",\n    \"age\": 30,\n    \"city\": \"Jakarta Selatan\",\n    \"preferredContactTime\": \"AFTERNOON\",\n    \"notes\": \"Optional note from the applicant\"\n  },\n  \"consent\": true\n}"
+            },
+            "url": "{{baseUrl}}/applications",
+            "description": "preferredContactTime is one of MORNING | AFTERNOON | EVENING. consent must be true or this returns 400. Creates the application already in SUBMITTED status (v0 simplification, see Docs/API-LIST-V0.md) and returns { id, referenceNo }."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin - Applications",
+      "item": [
+        {
+          "name": "List inbox (paginated + filterable)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/admin/applications?page=1&pageSize=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "applications"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "pageSize", "value": "20" },
+                { "key": "status", "value": "UNDER_REVIEW", "disabled": true, "description": "DRAFT | SUBMITTED | UNDER_REVIEW | APPROVED | REJECTED" },
+                { "key": "productId", "value": "", "disabled": true },
+                { "key": "assignedTo", "value": "unassigned", "disabled": true, "description": "a user id, or the literal string 'unassigned'" },
+                { "key": "search", "value": "", "disabled": true, "description": "matches reference no / applicant name / email / phone" }
+              ]
+            },
+            "description": "Requires permission applications:read."
+          }
+        },
+        {
+          "name": "Get application detail",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/admin/applications/{{applicationId}}",
+            "description": "Requires applications:read. Full detail incl. notes + status history + current assignment."
+          }
+        },
+        {
+          "name": "Start review (SUBMITTED -> UNDER_REVIEW)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/admin/applications/{{applicationId}}/start-review",
+            "description": "Requires applications:review. 409 if current status isn't SUBMITTED."
+          }
+        },
+        {
+          "name": "Approve (UNDER_REVIEW -> APPROVED)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/admin/applications/{{applicationId}}/approve",
+            "description": "Requires applications:approve. 409 if current status isn't UNDER_REVIEW."
+          }
+        },
+        {
+          "name": "Reject",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"reason\": \"Batas usia tertanggung melebihi ketentuan produk.\"\n}" },
+            "url": "{{baseUrl}}/admin/applications/{{applicationId}}/reject",
+            "description": "Requires applications:reject. reason is mandatory (400 if blank). Allowed from SUBMITTED or UNDER_REVIEW; 409 otherwise."
+          }
+        },
+        {
+          "name": "Assign (or unassign)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"userId\": \"{{userId}}\"\n}" },
+            "url": "{{baseUrl}}/admin/applications/{{applicationId}}/assign",
+            "description": "Requires applications:assign. Pass userId: null to unassign. Returns the full application detail."
+          }
+        },
+        {
+          "name": "Add internal note",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"content\": \"Contacted the applicant via WhatsApp to confirm identity documents.\"\n}" },
+            "url": "{{baseUrl}}/admin/applications/{{applicationId}}/notes",
+            "description": "Requires applications:note (deliberately excludes the read-only AUDITOR role)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin - Dashboard",
+      "item": [
+        {
+          "name": "Summary counts",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/admin/dashboard/summary",
+            "description": "Requires applications:read. Not called by the frontend yet - AdminDashboardView still aggregates client-side from the applications/audit lists it already has (see Docs/API-LIST-V0.md)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin - Products",
+      "item": [
+        {
+          "name": "List all products (incl. drafts/archived)",
+          "request": { "method": "GET", "url": "{{baseUrl}}/admin/products", "description": "Requires products:read." }
+        },
+        {
+          "name": "Create product",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"slug\": \"praxis-contoh-produk\",\n  \"name\": \"PRAXIS Contoh Produk\",\n  \"tagline\": \"Contoh tagline produk.\",\n  \"category\": \"LIFE\",\n  \"categoryLabel\": \"Proteksi Jiwa\",\n  \"summary\": \"Ringkasan produk.\",\n  \"targetAudience\": [\"Segmen A\", \"Segmen B\"],\n  \"minAge\": 18,\n  \"maxAge\": 60,\n  \"minSumAssured\": 100000000,\n  \"maxSumAssured\": 5000000000,\n  \"allowedPaymentTerms\": [5, 10, 15, 20],\n  \"coverageDurationYears\": 99,\n  \"baseAnnualRatePerMillion\": 18.5,\n  \"badge\": \"Baru\",\n  \"colorTone\": \"#0A3641\"\n}"
+            },
+            "url": "{{baseUrl}}/admin/products",
+            "description": "Requires products:write. category is one of LIFE | FAMILY | CRITICAL_ILLNESS | EDUCATION | SAVINGS | INVESTMENT. Always created as DRAFT. Not called by the frontend yet (ProductCmsView's Add Product button is still a local-only toast)."
+          }
+        },
+        {
+          "name": "Update product",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tagline\": \"Tagline yang diperbarui.\",\n  \"summary\": \"Ringkasan yang diperbarui.\"\n}"
+            },
+            "url": "{{baseUrl}}/admin/products/{{productId}}",
+            "description": "Requires products:write. Every field is optional - only send what changed. See update-product.dto.ts for the exact narrower field set this accepts (deliberately smaller than the create DTO)."
+          }
+        },
+        {
+          "name": "Publish product",
+          "request": { "method": "POST", "url": "{{baseUrl}}/admin/products/{{productId}}/publish", "description": "Requires products:publish." }
+        },
+        {
+          "name": "Archive product",
+          "request": { "method": "POST", "url": "{{baseUrl}}/admin/products/{{productId}}/archive", "description": "Requires products:publish." }
+        }
+      ]
+    },
+    {
+      "name": "Admin - Simulation Rules",
+      "item": [
+        {
+          "name": "List rule versions for a product",
+          "request": { "method": "GET", "url": "{{baseUrl}}/admin/products/{{productId}}/simulation-rules", "description": "Requires simulation_rules:read." }
+        },
+        {
+          "name": "Create a draft rule version",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"formulaConfig\": {\n    \"maxAgePlusTerm\": 75,\n    \"ageBands\": [\n      { \"min\": 18, \"max\": 30, \"factor\": 1.0 },\n      { \"min\": 31, \"max\": 40, \"factor\": 1.25 },\n      { \"min\": 41, \"max\": 50, \"factor\": 1.65 },\n      { \"min\": 51, \"max\": 60, \"factor\": 2.3 },\n      { \"min\": 61, \"max\": 65, \"factor\": 3.1 }\n    ],\n    \"termMultipliers\": [\n      { \"term\": 5, \"multiplier\": 1.0 },\n      { \"term\": 10, \"multiplier\": 0.95 },\n      { \"term\": 15, \"multiplier\": 0.91 },\n      { \"term\": 20, \"multiplier\": 0.86 }\n    ],\n    \"frequencyFactors\": {\n      \"MONTHLY\": 0.09,\n      \"QUARTERLY\": 0.26,\n      \"SEMI_ANNUAL\": 0.51,\n      \"ANNUAL\": 1.0\n    }\n  }\n}"
+            },
+            "url": "{{baseUrl}}/admin/products/{{productId}}/simulation-rules",
+            "description": "Requires simulation_rules:write. Always created as the next version number, status DRAFT. See Backends/src/simulator/interfaces/formula-config.interface.ts for the exact shape."
+          }
+        },
+        {
+          "name": "Activate a rule version",
+          "request": {
+            "method": "PATCH",
+            "url": "{{baseUrl}}/admin/simulation-rules/{{ruleVersionId}}/activate",
+            "description": "Requires simulation_rules:write. Automatically retires whichever version was previously ACTIVE for that product."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin - Users & Organization",
+      "item": [
+        {
+          "name": "List all staff users",
+          "request": { "method": "GET", "url": "{{baseUrl}}/admin/users", "description": "Requires users:manage." }
+        },
+        {
+          "name": "Create staff user",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"new.staff@praxis.co.id\",\n  \"fullName\": \"New Staff Member\",\n  \"role\": \"UNDERWRITER\",\n  \"department\": \"Life & Medical Assessment\",\n  \"managerId\": null,\n  \"password\": \"changeme123\"\n}"
+            },
+            "url": "{{baseUrl}}/admin/users",
+            "description": "Requires users:manage. role is one of UNDERWRITER_MANAGER | SENIOR_UNDERWRITER | UNDERWRITER | TELE_CONSULTANT | ADMIN | AUDITOR. password needs 8+ chars, gets argon2-hashed server-side."
+          }
+        },
+        {
+          "name": "Change a user's manager",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"managerId\": \"{{userId}}\"\n}" },
+            "url": "{{baseUrl}}/admin/users/{{userId}}/manager",
+            "description": "Requires organization:manage. Pass managerId: null to clear it. Server walks the proposed manager's own chain and rejects (400) any change that would create a cycle."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin - Audit Log",
+      "item": [
+        {
+          "name": "List audit log (most recent 200)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/admin/audit?search=&action=",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "audit"],
+              "query": [
+                { "key": "search", "value": "", "disabled": true, "description": "matches description / actorLabel / entityId" },
+                { "key": "action", "value": "STATUS_UPDATE", "disabled": true }
+              ]
+            },
+            "description": "Requires audit:read. Append-only, capped at 200 most recent rows (v0 limitation, see audit.service.ts)."
+          }
+        }
+      ]
+    }
+  ]
+}

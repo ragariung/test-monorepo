@@ -1,0 +1,287 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum StaffRole {
+  UNDERWRITER_MANAGER
+  SENIOR_UNDERWRITER
+  UNDERWRITER
+  TELE_CONSULTANT
+  ADMIN
+  AUDITOR
+}
+
+enum ProductStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum ProductCategory {
+  LIFE
+  FAMILY
+  CRITICAL_ILLNESS
+  EDUCATION
+  SAVINGS
+  INVESTMENT
+}
+
+enum DocumentType {
+  BROCHURE
+  RIPLAY
+  TERMS
+  OTHER
+}
+
+enum RuleVersionStatus {
+  DRAFT
+  ACTIVE
+  RETIRED
+}
+
+enum PaymentFrequency {
+  MONTHLY
+  QUARTERLY
+  SEMI_ANNUAL
+  ANNUAL
+}
+
+enum ApplicationStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+}
+
+enum ContactTime {
+  MORNING
+  AFTERNOON
+  EVENING
+}
+
+model User {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  passwordHash String
+  fullName     String
+  role         StaffRole
+  department   String?
+  managerId    String?
+  manager      User?     @relation("ManagerHierarchy", fields: [managerId], references: [id])
+  reports      User[]    @relation("ManagerHierarchy")
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  assignedApplications ApplicationAssignment[]     @relation("AssignedTo")
+  madeAssignments      ApplicationAssignment[]     @relation("AssignedBy")
+  statusChanges        ApplicationStatusHistory[]
+  notes                ApplicationNote[]
+  auditLogs            AuditLog[]
+  ruleVersionsAuthored SimulationRuleVersion[]
+}
+
+model Product {
+  id                       String          @id @default(uuid())
+  slug                     String          @unique
+  name                     String
+  tagline                  String
+  category                 ProductCategory
+  categoryLabel            String
+  summary                  String
+  targetAudience           String[]
+  minAge                   Int
+  maxAge                   Int
+  minSumAssured            Decimal
+  maxSumAssured            Decimal
+  allowedPaymentTerms      Int[]
+  coverageDurationYears    Int
+  baseAnnualRatePerMillion Decimal
+  status                   ProductStatus   @default(DRAFT)
+  badge                    String?
+  colorTone                String?
+  publishedAt              DateTime?
+  createdAt                DateTime        @default(now())
+  updatedAt                DateTime        @updatedAt
+
+  benefits              ProductBenefit[]
+  coverageDetails       ProductCoverageDetail[]
+  eligibilityConditions ProductEligibilityCondition[]
+  documents             ProductDocument[]
+  ruleVersions          SimulationRuleVersion[]
+  simulationRuns        SimulationRun[]
+  applications          Application[]
+}
+
+model ProductBenefit {
+  id          String  @id @default(uuid())
+  productId   String
+  product     Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  title       String
+  description String
+  iconName    String?
+  sortOrder   Int     @default(0)
+}
+
+model ProductCoverageDetail {
+  id            String  @id @default(uuid())
+  productId     String
+  product       Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  category      String
+  benefit       String
+  maximumPayout String
+  notes         String?
+  sortOrder     Int     @default(0)
+}
+
+model ProductEligibilityCondition {
+  id        String  @id @default(uuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  text      String
+  sortOrder Int     @default(0)
+}
+
+model ProductDocument {
+  id           String       @id @default(uuid())
+  productId    String
+  product      Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  name         String
+  documentType DocumentType
+  sizeLabel    String?
+  url          String
+  createdAt    DateTime     @default(now())
+}
+
+model SimulationRuleVersion {
+  id            String            @id @default(uuid())
+  productId     String
+  product       Product           @relation(fields: [productId], references: [id], onDelete: Cascade)
+  version       Int
+  status        RuleVersionStatus @default(DRAFT)
+  effectiveFrom DateTime?
+  effectiveTo   DateTime?
+  formulaConfig Json
+  createdById   String?
+  createdBy     User?             @relation(fields: [createdById], references: [id])
+  createdAt     DateTime          @default(now())
+
+  simulationRuns SimulationRun[]
+  applications   Application[]
+
+  @@unique([productId, version])
+}
+
+model SimulationRun {
+  id                     String                @id @default(uuid())
+  productId              String
+  product                Product               @relation(fields: [productId], references: [id])
+  ruleVersionId          String
+  ruleVersion            SimulationRuleVersion @relation(fields: [ruleVersionId], references: [id])
+  age                    Int
+  sumAssured             Decimal
+  paymentTermYears       Int
+  paymentFrequency       PaymentFrequency
+  isValid                Boolean
+  validationError        String?
+  monthlyPremium         Decimal?
+  quarterlyPremium       Decimal?
+  semiAnnualPremium      Decimal?
+  annualPremium          Decimal?
+  totalEstimatedPayment  Decimal?
+  createdAt              DateTime              @default(now())
+
+  applications Application[]
+}
+
+model Application {
+  id                   String                 @id @default(uuid())
+  referenceNo          String                 @unique
+  productId            String
+  product              Product                @relation(fields: [productId], references: [id])
+  simulationRunId      String?
+  simulationRun        SimulationRun?         @relation(fields: [simulationRunId], references: [id])
+  ruleVersionId        String?
+  ruleVersion          SimulationRuleVersion? @relation(fields: [ruleVersionId], references: [id])
+  status               ApplicationStatus      @default(SUBMITTED)
+
+  applicantFullName    String
+  applicantEmail       String
+  applicantPhone       String
+  applicantAge         Int
+  applicantCity        String
+  preferredContactTime ContactTime
+  applicantNotes       String?
+  dataConsentAt        DateTime
+
+  productSnapshot      Json
+  simulationSnapshot   Json
+
+  rejectionReason      String?
+  submittedAt          DateTime  @default(now())
+  approvedAt           DateTime?
+  rejectedAt           DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  assignments   ApplicationAssignment[]
+  statusHistory ApplicationStatusHistory[]
+  notes         ApplicationNote[]
+}
+
+model ApplicationAssignment {
+  id            String      @id @default(uuid())
+  applicationId String
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  assignedToId  String
+  assignedTo    User        @relation("AssignedTo", fields: [assignedToId], references: [id])
+  assignedById  String?
+  assignedBy    User?       @relation("AssignedBy", fields: [assignedById], references: [id])
+  assignedAt    DateTime    @default(now())
+  unassignedAt  DateTime?
+  reason        String?
+}
+
+model ApplicationStatusHistory {
+  id            String             @id @default(uuid())
+  applicationId String
+  application   Application        @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  fromStatus    ApplicationStatus?
+  toStatus      ApplicationStatus
+  changedById   String?
+  changedBy     User?              @relation(fields: [changedById], references: [id])
+  comment       String?
+  createdAt     DateTime           @default(now())
+}
+
+model ApplicationNote {
+  id            String      @id @default(uuid())
+  applicationId String
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  authorId      String?
+  author        User?       @relation(fields: [authorId], references: [id])
+  content       String
+  isInternal    Boolean     @default(true)
+  createdAt     DateTime    @default(now())
+}
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  actorId     String?
+  actor       User?    @relation(fields: [actorId], references: [id])
+  actorLabel  String
+  action      String
+  entityType  String
+  entityId    String
+  description String
+  beforeData  Json?
+  afterData   Json?
+  ipAddress   String?
+  createdAt   DateTime @default(now())
+}
