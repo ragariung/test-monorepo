@@ -4,10 +4,6 @@ A lightweight digital insurance product discovery and lead/application platform 
 
 This is a business-process **MVP prototype**, not a production purchasing/underwriting platform. See [`Docs/PRD.md`](Docs/PRD.md) §6 for explicit in-scope/out-of-scope boundaries.
 
-## Status
-
-🔌 **Mostly wired, plus a working chatbot.** [`Backends/`](Backends/) is a real, implemented, and verified NestJS + Prisma API. [`Frontends/`](Frontends/) ("PRAXIS Insurance") now calls it for real for: the entire public conversion funnel (browse → simulate → apply → submit), admin login/logout/session restore, the application review workflow (inbox, detail, start-review/approve/reject/assign/edit-lead/convert-lead/decline-lead, internal notes, CSV export), the dashboard, and organization management (employee list, invite, manager-hierarchy reassignment, a live role-permission matrix). Still running on mock data ([`src/data/mockData.ts`](Frontends/src/data/mockData.ts)): Product CMS edits and Simulation Rules management. [`Automation/`](Automation/) runs a self-hosted n8n instance with the "PRAXIS Assistant" workflow — answers prospect product questions grounded in real `Backends/` data (with memory across turns), runs real premium simulations, and captures interested leads via `POST /leads`; a floating `ChatWidget` on every public page (`Frontends/src/components/common/ChatWidget.tsx`) talks to it directly. See [`Docs/DATA-STRUCTURE.md`](Docs/DATA-STRUCTURE.md) for exactly what's wired vs. mock, and [`Docs/API-COLLECTION.postman.json`](Docs/API-COLLECTION.postman.json) to exercise the full API directly. [`docker-compose.yml`](docker-compose.yml) runs all four services (frontend, backend, Postgres, n8n) together locally.
-
 ## Stack
 
 - **Frontend:** React 19 + Vite + TypeScript + Tailwind CSS v4 + Framer Motion — see [`Frontends/README.md`](Frontends/README.md)
@@ -107,7 +103,7 @@ Demo admin logins: any seeded staff email (e.g. `sarah.wijaya@praxis.co.id`) wit
 insurance-mvp/
 ├── Docs/                     product/architecture docs (see table above)
 ├── Backends/                 NestJS + Prisma API (implemented, verified)
-├── Frontends/                React + Vite app (mostly wired to Backends/ — see Status above)
+├── Frontends/                React + Vite app (mostly wired to Backends/ — see Status below)
 ├── Automation/                self-hosted n8n — "PRAXIS Assistant" chat workflow
 └── docker-compose.yml        runs all four services together
 ```
@@ -118,4 +114,8 @@ insurance-mvp/
 
 **Admin:** login → dashboard → application inbox/detail → status workflow (`SUBMITTED → UNDER_REVIEW → APPROVED/REJECTED`) → assignment via manager hierarchy → product CMS → simulation rule versioning → audit log.
 
-Explicitly out of scope for this MVP: policy issuance, payments,Full KYC verification, full medical underwriting, claims processing, mobile apps. Full list in [`Docs/PRD.md`](Docs/PRD.md) §6.
+Explicitly out of scope for this MVP: policy issuance, payments, full KYC verification, full medical underwriting, claims processing, mobile apps. (Staff *can* record partial KYC/health intake by hand during a call — see Status below — but there's no document verification, automated identity checks, or underwriting decisioning built on top of it.) Full list in [`Docs/PRD.md`](Docs/PRD.md) §6.
+
+## Status
+
+🔌 **Mostly wired, plus a working chatbot.** [`Backends/`](Backends/) is a real, implemented, and verified NestJS + Prisma API. [`Frontends/`](Frontends/) ("PRAXIS Insurance") now calls it for real for: the entire public conversion funnel (browse → simulate → apply → submit), admin login/logout/session restore, the application review workflow (inbox, detail, start-review/approve/reject/assign/edit-lead/convert-lead/decline-lead, internal notes, CSV export), the dashboard (its six summary cards deep-link into a pre-filtered inbox), and organization management (employee list, invite, manager-hierarchy reassignment, a live role-permission matrix). Application visibility is role-scoped: Admin/Underwriter Manager/Auditor see everything, Senior Underwriter/Underwriter/Tele-Consultant only see applications assigned to them (plus all `DRAFT` leads, which stay an unclaimed pool anyone can work). Staff can also record **partial KYC** data during a call with a prospect — date of birth, height, weight, smoking/alcohol habits, and free-text medical history — via the same lead-edit form; this is intake data for underwriting to review, not automated verification. Still running on mock data ([`src/data/mockData.ts`](Frontends/src/data/mockData.ts)): Product CMS edits and Simulation Rules management. [`Automation/`](Automation/) runs a self-hosted n8n instance with the "PRAXIS Assistant" workflow — answers prospect product questions grounded in real `Backends/` data (with memory across turns), runs real premium simulations, and captures interested leads via `POST /leads`; a floating `ChatWidget` on every public page (`Frontends/src/components/common/ChatWidget.tsx`) talks to it directly. See [`Docs/DATA-STRUCTURE.md`](Docs/DATA-STRUCTURE.md) for exactly what's wired vs. mock, and [`Docs/API-COLLECTION.postman.json`](Docs/API-COLLECTION.postman.json) to exercise the full API directly. [`docker-compose.yml`](docker-compose.yml) runs all four services (frontend, backend, Postgres, n8n) together locally.
